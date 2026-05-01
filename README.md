@@ -14,4 +14,25 @@ The goal is to build a complete, secure software supply chain using GitHub Actio
 - **Deployment**: Helm charts.
 - **CI/CD**: GitHub Actions.
 
+## Current Status
+
+- **Services**: `auth-service` and `api-service` (Flask) with basic health endpoints.
+- **Docker**: Dockerfiles for both services (non-root).
+- **Local runtime**: `docker-compose.yml` with Redis.
+- **CI**: GitHub Actions pipeline with tests and Docker builds.
+- **SAST**: Semgrep scan with a minimal ruleset.
+- **SBOM**: Manual generation via `workflow_dispatch`.
+
+## Repo Structure
+
+```
+services/
+  auth-service/
+  api-service/
+infrastructure/
+  helm/
+  kubernetes/
+.github/workflows/
+```
+
 *This README is a work in progress and will be updated as the project evolves.*

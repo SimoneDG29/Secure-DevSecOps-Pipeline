@@ -1,0 +1,12 @@
+rules:
+  - id: python.security.eval-use
+    pattern: eval($X)
+    message: "Avoid eval()."
+    languages: [python]
+    severity: ERROR
+
+  - id: python.security.subprocess-shell-true
+    pattern: subprocess.run(..., shell=True ...)
+    message: "Avoid shell=True."
+    languages: [python]
+    severity: ERROR
