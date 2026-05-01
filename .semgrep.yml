@@ -6,7 +6,7 @@ rules:
     severity: ERROR
 
   - id: python.security.subprocess-shell-true
-    pattern: subprocess.run(..., shell=True ...)
+    pattern: subprocess.run(..., shell=True, ...)
     message: "Avoid shell=True."
     languages: [python]
     severity: ERROR
