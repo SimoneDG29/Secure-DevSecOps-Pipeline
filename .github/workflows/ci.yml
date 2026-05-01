@@ -99,14 +99,14 @@ jobs:
           tags: api-service:ci
 
       - name: Generate SBOM for auth-service
-        uses: anchore/sbom-action@v0.16.0
+        uses: anchore/sbom-action@v0.24.0
         with:
           image: auth-service:ci
           format: spdx-json
           output-file: auth-service-sbom.spdx.json
 
       - name: Generate SBOM for api-service
-        uses: anchore/sbom-action@v0.16.0
+        uses: anchore/sbom-action@v0.24.0
         with:
           image: api-service:ci
           format: spdx-json
