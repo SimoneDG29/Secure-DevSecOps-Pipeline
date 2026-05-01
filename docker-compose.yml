@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  auth-service:
+    build:
+      context: ./services/auth-service
+    ports:
+      - "5001:5001"
+    depends_on:
+      - redis
+
+  api-service:
+    build:
+      context: ./services/api-service
+    ports:
+      - "5002:5002"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
