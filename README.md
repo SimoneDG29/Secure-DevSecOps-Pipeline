@@ -22,6 +22,7 @@ The goal is to build a complete, secure software supply chain using GitHub Actio
 - **CI**: GitHub Actions pipeline with tests and Docker builds.
 - **SAST**: Semgrep scan with a minimal ruleset.
 - **SBOM**: Manual generation via `workflow_dispatch`.
+- **Dependency updates**: Dependabot (weekly) — currently disabled to avoid PRs.
 
 ## Repo Structure
 
