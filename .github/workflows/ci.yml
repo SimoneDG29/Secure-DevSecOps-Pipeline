@@ -74,21 +74,20 @@ jobs:
           load: true
           tags: api-service:ci
 
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
       - name: Scan auth-service image
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: auth-service:ci
-          format: table
-          exit-code: "1"
-          severity: "CRITICAL,HIGH"
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL auth-service:ci
 
       - name: Scan api-service image
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: api-service:ci
-          format: table
-          exit-code: "1"
-          severity: "CRITICAL,HIGH"
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL api-service:ci
 
   sbom:
     runs-on: ubuntu-latest
