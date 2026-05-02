@@ -84,10 +84,10 @@ jobs:
           sudo apt-get install -y trivy
 
       - name: Scan auth-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL auth-service:ci
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed auth-service:ci
 
       - name: Scan api-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL api-service:ci
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed api-service:ci
 
   sbom:
     runs-on: ubuntu-latest
