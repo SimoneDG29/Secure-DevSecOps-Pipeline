@@ -50,7 +50,7 @@ jobs:
       - name: Run Semgrep (fail on invalid rules)
         run: semgrep --config .semgrep.yml --error --strict
 
-  build-images:
+  build-and-scan-images:
     runs-on: ubuntu-latest
     needs: lint-test
     steps:
@@ -73,6 +73,22 @@ jobs:
           context: ./services/api-service
           load: true
           tags: api-service:ci
+
+      - name: Scan auth-service image
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: auth-service:ci
+          format: table
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
+      - name: Scan api-service image
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: api-service:ci
+          format: table
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
 
   sbom:
     runs-on: ubuntu-latest

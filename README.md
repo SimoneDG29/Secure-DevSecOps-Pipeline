@@ -21,6 +21,7 @@ The goal is to build a complete, secure software supply chain using GitHub Actio
 - **Local runtime**: `docker-compose.yml` with Redis.
 - **CI**: GitHub Actions pipeline with tests and Docker builds.
 - **SAST**: Semgrep scan with a minimal ruleset.
+- **Container Scanning**: Trivy (fail on HIGH/CRITICAL).
 - **SBOM**: Manual generation via `workflow_dispatch`.
 - **Dependency updates**: Dependabot (weekly) — currently disabled to avoid PRs.
 
