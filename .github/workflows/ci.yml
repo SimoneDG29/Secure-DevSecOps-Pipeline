@@ -70,6 +70,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set GHCR owner (lowercase)
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build auth-service image
         uses: docker/build-push-action@v6
         with:
@@ -101,14 +104,14 @@ jobs:
 
       - name: Tag images for GHCR
         run: |
-          docker tag auth-service:ci ghcr.io/${{ github.repository_owner }}/auth-service:ci
-          docker tag api-service:ci ghcr.io/${{ github.repository_owner }}/api-service:ci
+          docker tag auth-service:ci ghcr.io/${{ env.OWNER }}/auth-service:ci
+          docker tag api-service:ci ghcr.io/${{ env.OWNER }}/api-service:ci
 
       - name: Push images to GHCR
         if: github.ref == 'refs/heads/main'
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/auth-service:ci
-          docker push ghcr.io/${{ github.repository_owner }}/api-service:ci
+          docker push ghcr.io/${{ env.OWNER }}/auth-service:ci
+          docker push ghcr.io/${{ env.OWNER }}/api-service:ci
 
   sbom:
     runs-on: ubuntu-latest
@@ -127,23 +130,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set GHCR owner (lowercase)
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Pull auth-service image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/auth-service:ci
+        run: docker pull ghcr.io/${{ env.OWNER }}/auth-service:ci
 
       - name: Pull api-service image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/api-service:ci
+        run: docker pull ghcr.io/${{ env.OWNER }}/api-service:ci
 
       - name: Generate SBOM for auth-service
         uses: anchore/sbom-action@v0.16.0
         with:
-          image: ghcr.io/${{ github.repository_owner }}/auth-service:ci
+          image: ghcr.io/${{ env.OWNER }}/auth-service:ci
           format: spdx-json
           output-file: auth-service-sbom.spdx.json
 
       - name: Generate SBOM for api-service
         uses: anchore/sbom-action@v0.16.0
         with:
-          image: ghcr.io/${{ github.repository_owner }}/api-service:ci
+          image: ghcr.io/${{ env.OWNER }}/api-service:ci
           format: spdx-json
           output-file: api-service-sbom.spdx.json
 
