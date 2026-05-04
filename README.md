@@ -25,6 +25,7 @@ The goal is to build a complete, secure software supply chain using GitHub Actio
 - **Image signing**: Cosign keyless signing via GitHub OIDC.
 - **Helm**: Chart scaffolding and templates for services (deployment source of truth).
 - **Kubernetes manifests**: Kept in `infrastructure/kubernetes/` for reference only.
+- **CD**: GitHub Actions deploys to Kubernetes via Helm using a manual `workflow_dispatch` job (local clusters aren’t reachable from GitHub runners).
 - **SBOM**: Manual generation via `workflow_dispatch`.
 - **Dependency updates**: Dependabot (weekly) — currently disabled to avoid PRs.
 
