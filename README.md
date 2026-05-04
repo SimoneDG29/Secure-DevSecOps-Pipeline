@@ -19,13 +19,14 @@ The goal is to build a complete, secure software supply chain using GitHub Actio
 - **Services**: `auth-service` and `api-service` (Flask) with basic health endpoints.
 - **Docker**: Dockerfiles for both services (non-root).
 - **Local runtime**: `docker-compose.yml` with Redis.
-- **CI**: GitHub Actions pipeline with tests and Docker builds.
+- **CI**: PRs run validation only (lint/test, Semgrep, Helm lint).
+- **Release**: Push to `main` builds, scans, pushes, and signs images.
 - **SAST**: Semgrep scan with a minimal ruleset.
 - **Container Scanning**: Trivy (fail on HIGH/CRITICAL).
 - **Image signing**: Cosign keyless signing via GitHub OIDC.
 - **Helm**: Chart scaffolding and templates for services (deployment source of truth).
 - **Kubernetes manifests**: Kept in `infrastructure/kubernetes/` for reference only.
-- **CD**: GitHub Actions deploys to Kubernetes via Helm using a manual `workflow_dispatch` job (local clusters aren’t reachable from GitHub runners).
+- **CD**: Manual `workflow_dispatch` deploy via Helm (local clusters aren’t reachable from GitHub runners).
 - **SBOM**: Manual generation via `workflow_dispatch`.
 - **Dependency updates**: Dependabot (weekly) — currently disabled to avoid PRs.
 
