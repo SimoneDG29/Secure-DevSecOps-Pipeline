@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api-service
+  labels:
+    app: api-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.apiService.replicaCount }}
+  selector:
+    matchLabels:
+      app: api-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: api-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: api-service
+          image: "{{ .Values.apiService.image.repository }}:{{ .Values.apiService.image.tag }}"
+          imagePullPolicy: {{ .Values.apiService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.apiService.service.port }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.apiService.probes.readiness.path }}
+              port: {{ .Values.apiService.service.port }}
+            initialDelaySeconds: {{ .Values.apiService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.apiService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.apiService.probes.liveness.path }}
+              port: {{ .Values.apiService.service.port }}
+            initialDelaySeconds: {{ .Values.apiService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.apiService.probes.liveness.periodSeconds }}
+          resources:
+            requests:
+              cpu: {{ .Values.apiService.resources.requests.cpu | quote }}
+              memory: {{ .Values.apiService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.apiService.resources.limits.cpu | quote }}
+              memory: {{ .Values.apiService.resources.limits.memory | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api-service
+  labels:
+    app: api-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: api-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.apiService.service.port }}
+      targetPort: {{ .Values.apiService.service.port }}
+  type: ClusterIP

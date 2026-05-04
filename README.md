@@ -23,6 +23,8 @@ The goal is to build a complete, secure software supply chain using GitHub Actio
 - **SAST**: Semgrep scan with a minimal ruleset.
 - **Container Scanning**: Trivy (fail on HIGH/CRITICAL).
 - **Image signing**: Cosign keyless signing via GitHub OIDC.
+- **Helm**: Chart scaffolding and templates for services (deployment source of truth).
+- **Kubernetes manifests**: Kept in `infrastructure/kubernetes/` for reference only.
 - **SBOM**: Manual generation via `workflow_dispatch`.
 - **Dependency updates**: Dependabot (weekly) — currently disabled to avoid PRs.
 

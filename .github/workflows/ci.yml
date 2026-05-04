@@ -50,6 +50,18 @@ jobs:
       - name: Run Semgrep (fail on invalid rules)
         run: semgrep --config .semgrep.yml --error --strict
 
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint Helm chart
+        run: helm lint infrastructure/helm/secure-pipeline
+
   build-and-scan-images:
     runs-on: ubuntu-latest
     needs: lint-test

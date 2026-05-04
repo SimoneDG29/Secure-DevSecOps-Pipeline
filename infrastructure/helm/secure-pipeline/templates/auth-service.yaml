@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-auth-service
+  labels:
+    app: auth-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.authService.replicaCount }}
+  selector:
+    matchLabels:
+      app: auth-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: auth-service
+          image: "{{ .Values.authService.image.repository }}:{{ .Values.authService.image.tag }}"
+          imagePullPolicy: {{ .Values.authService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.authService.service.port }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.authService.probes.readiness.path }}
+              port: {{ .Values.authService.service.port }}
+            initialDelaySeconds: {{ .Values.authService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.authService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.authService.probes.liveness.path }}
+              port: {{ .Values.authService.service.port }}
+            initialDelaySeconds: {{ .Values.authService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.authService.probes.liveness.periodSeconds }}
+          resources:
+            requests:
+              cpu: {{ .Values.authService.resources.requests.cpu | quote }}
+              memory: {{ .Values.authService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.authService.resources.limits.cpu | quote }}
+              memory: {{ .Values.authService.resources.limits.memory | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-auth-service
+  labels:
+    app: auth-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: auth-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.authService.service.port }}
+      targetPort: {{ .Values.authService.service.port }}
+  type: ClusterIP
