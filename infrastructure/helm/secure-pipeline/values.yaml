@@ -23,6 +23,36 @@ authService:
       cpu: "250m"
       memory: "256Mi"
 
+productsService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/your-username/products-service
+    tag: ci
+    pullPolicy: IfNotPresent
+  service:
+    port: 5003
+  secretRef:
+    name: products-db-secret
+  probes:
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 10
+      periodSeconds: 15
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+postgresql:
+  enabled: false
+
 apiService:
   replicaCount: 1
   image:

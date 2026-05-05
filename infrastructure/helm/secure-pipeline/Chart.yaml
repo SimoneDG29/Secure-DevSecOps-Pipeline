@@ -1,6 +1,11 @@
 apiVersion: v2
 name: secure-pipeline
-description: Helm chart for auth-service and api-service
+description: Helm chart for auth-service, api-service, and products-service
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
+
+dependencies:
+  - name: postgresql
+    version: 15.5.24
+    repository: https://charts.bitnami.com/bitnami

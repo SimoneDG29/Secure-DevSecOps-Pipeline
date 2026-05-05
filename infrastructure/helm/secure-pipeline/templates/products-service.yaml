@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-products-service
+  labels:
+    app: products-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.productsService.replicaCount }}
+  selector:
+    matchLabels:
+      app: products-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: products-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: products-service
+          image: "{{ .Values.productsService.image.repository }}:{{ .Values.productsService.image.tag }}"
+          imagePullPolicy: {{ .Values.productsService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.productsService.service.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.productsService.secretRef.name }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.productsService.probes.readiness.path }}
+              port: {{ .Values.productsService.service.port }}
+            initialDelaySeconds: {{ .Values.productsService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.productsService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.productsService.probes.liveness.path }}
+              port: {{ .Values.productsService.service.port }}
+            initialDelaySeconds: {{ .Values.productsService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.productsService.probes.liveness.periodSeconds }}
+          resources:
+            requests:
+              cpu: {{ .Values.productsService.resources.requests.cpu | quote }}
+              memory: {{ .Values.productsService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.productsService.resources.limits.cpu | quote }}
+              memory: {{ .Values.productsService.resources.limits.memory | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-products-service
+  labels:
+    app: products-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: products-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.productsService.service.port }}
+      targetPort: {{ .Values.productsService.service.port }}
+  type: ClusterIP
