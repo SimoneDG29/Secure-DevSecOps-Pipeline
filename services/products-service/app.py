@@ -1,11 +1,10 @@
 from db import init_db
-from flask import Flask, jsonify
+from flask import Flask
+from routes import register_routes
 
 app = Flask(__name__)
 
-@app.get("/healthz")
-def healthz():
-    return jsonify(status="ok"), 200
+register_routes(app)
 
 if __name__ == "__main__":
     init_db()
