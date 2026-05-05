@@ -27,11 +27,18 @@ jobs:
         run: |
           pip install -r services/api-service/requirements.txt -r services/api-service/requirements-dev.txt
 
+      - name: Install products-service deps
+        run: |
+          pip install -r services/products-service/requirements.txt -r services/products-service/requirements-dev.txt
+
       - name: Run auth-service tests
         run: pytest services/auth-service/tests
 
       - name: Run api-service tests
         run: pytest services/api-service/tests
+
+      - name: Run products-service tests
+        run: pytest services/products-service/tests
 
   semgrep:
     runs-on: ubuntu-latest
