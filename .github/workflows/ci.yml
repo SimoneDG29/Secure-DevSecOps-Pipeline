@@ -27,11 +27,18 @@ jobs:
         run: |
           pip install -r services/api-service/requirements.txt -r services/api-service/requirements-dev.txt
 
+      - name: Install products-service deps
+        run: |
+          pip install -r services/products-service/requirements.txt -r services/products-service/requirements-dev.txt
+
       - name: Run auth-service tests
         run: pytest services/auth-service/tests
 
       - name: Run api-service tests
         run: pytest services/api-service/tests
+
+      - name: Run products-service tests
+        run: pytest services/products-service/tests
 
   semgrep:
     runs-on: ubuntu-latest
@@ -100,6 +107,13 @@ jobs:
           load: true
           tags: api-service:ci
 
+      - name: Build products-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/products-service
+          load: true
+          tags: products-service:ci
+
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -115,16 +129,21 @@ jobs:
       - name: Scan api-service image
         run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed api-service:ci
 
+      - name: Scan products-service image
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed products-service:ci
+
       - name: Tag images for GHCR
         run: |
           docker tag auth-service:ci ghcr.io/${{ env.OWNER }}/auth-service:ci
           docker tag api-service:ci ghcr.io/${{ env.OWNER }}/api-service:ci
+          docker tag products-service:ci ghcr.io/${{ env.OWNER }}/products-service:ci
 
       - name: Push images to GHCR
         if: github.ref == 'refs/heads/main'
         run: |
           docker push ghcr.io/${{ env.OWNER }}/auth-service:ci
           docker push ghcr.io/${{ env.OWNER }}/api-service:ci
+          docker push ghcr.io/${{ env.OWNER }}/products-service:ci
 
   sign-images:
     runs-on: ubuntu-latest
@@ -154,9 +173,33 @@ jobs:
       - name: Sign api-service image (keyless)
         run: cosign sign --yes ghcr.io/${{ env.OWNER }}/api-service:ci
 
+      - name: Sign products-service image (keyless)
+        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/products-service:ci
+
+  create-secrets:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    steps:
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+
+      - name: Create Kubernetes Secret
+        run: |
+          kubectl create secret generic products-db-secret \
+            --from-literal=DB_HOST=${{ secrets.DB_HOST }} \
+            --from-literal=DB_PORT=${{ secrets.DB_PORT }} \
+            --from-literal=DB_NAME=${{ secrets.DB_NAME }} \
+            --from-literal=DB_USER=${{ secrets.DB_USER }} \
+            --from-literal=DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
   deploy:
     runs-on: ubuntu-latest
-    needs: [helm-lint]
+    needs: [helm-lint, create-secrets]
     if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
@@ -180,8 +223,10 @@ jobs:
           helm upgrade --install secure-pipeline infrastructure/helm/secure-pipeline \
             --set authService.image.repository=ghcr.io/${{ env.OWNER }}/auth-service \
             --set apiService.image.repository=ghcr.io/${{ env.OWNER }}/api-service \
+            --set productsService.image.repository=ghcr.io/${{ env.OWNER }}/products-service \
             --set authService.image.tag=ci \
-            --set apiService.image.tag=ci
+            --set apiService.image.tag=ci \
+            --set productsService.image.tag=ci
 
   sbom:
     runs-on: ubuntu-latest
@@ -209,6 +254,9 @@ jobs:
       - name: Pull api-service image
         run: docker pull ghcr.io/${{ env.OWNER }}/api-service:ci
 
+      - name: Pull products-service image
+        run: docker pull ghcr.io/${{ env.OWNER }}/products-service:ci
+
       - name: Generate SBOM for auth-service
         uses: anchore/sbom-action@v0.16.0
         with:
@@ -223,6 +271,13 @@ jobs:
           format: spdx-json
           output-file: api-service-sbom.spdx.json
 
+      - name: Generate SBOM for products-service
+        uses: anchore/sbom-action@v0.16.0
+        with:
+          image: ghcr.io/${{ env.OWNER }}/products-service:ci
+          format: spdx-json
+          output-file: products-service-sbom.spdx.json
+
       - name: Upload SBOMs
         uses: actions/upload-artifact@v4
         with:
@@ -230,3 +285,4 @@ jobs:
           path: |
             auth-service-sbom.spdx.json
             api-service-sbom.spdx.json
+            products-service-sbom.spdx.json
