@@ -1,45 +1,507 @@
-# Secure CI/CD Pipeline for Microservices
+# Secure CI/CD Pipeline for Flask Microservices with DevSecOps Controls
 
-This project is a hands-on demonstration of a secure CI/CD pipeline for a microservices-based application. It is designed to be built incrementally, with each step introducing new security controls and DevSecOps best practices.
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![Docker](https://img.shields.io/badge/docker-enabled-blue)
+![Kubernetes](https://img.shields.io/badge/kubernetes-ready-blue)
+![Helm](https://img.shields.io/badge/helm-enabled-blue)
+![Security](https://img.shields.io/badge/devsecops-integrated-green)
 
-## Project Goal
+## Table of Contents
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Microservices](#microservices)
+- [Infrastructure & Orchestration](#infrastructure--orchestration)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Pipeline Flow](#pipeline-flow)
+- [Security Controls](#security-controls)
+- [Local Development](#local-development)
+- [Deployment Guide](#deployment-guide)
+- [Testing](#testing)
+- [Repository Structure](#repository-structure)
+- [Roadmap](#roadmap)
+- [References](#references)
 
-The goal is to build a complete, secure software supply chain using GitHub Actions, Docker, Kubernetes, and various open-source security tools.
+---
 
-## Architecture
+# Project Overview
 
-- **Microservices**: Two simple services (`auth-service` and `api-service`).
-- **Containerization**: Docker.
-- **Orchestration**: Kubernetes (local cluster via `kind` or `minikube`).
-- **Deployment**: Helm charts.
-- **CI/CD**: GitHub Actions.
+This project simulates a production-inspired DevSecOps workflow for a Flask-based microservices application.
 
-## Current Status
+The main goal is to demonstrate:
 
-- **Services**: `auth-service` and `api-service` (Flask) with basic health endpoints.
-- **Docker**: Dockerfiles for both services (non-root).
-- **Local runtime**: `docker-compose.yml` with Redis.
-- **CI**: PRs run validation only (lint/test, Semgrep, Helm lint).
-- **Release**: Push to `main` builds, scans, pushes, and signs images.
-- **SAST**: Semgrep scan with a minimal ruleset.
-- **Container Scanning**: Trivy (fail on HIGH/CRITICAL).
-- **Image signing**: Cosign keyless signing via GitHub OIDC.
-- **Helm**: Chart scaffolding and templates for services (deployment source of truth).
-- **Kubernetes manifests**: Kept in `infrastructure/kubernetes/` for reference only.
-- **CD**: Manual `workflow_dispatch` deploy via Helm (local clusters aren’t reachable from GitHub runners).
-- **SBOM**: Manual generation via `workflow_dispatch`.
-- **Dependency updates**: Dependabot (weekly) — currently disabled to avoid PRs.
+- secure CI/CD automation with GitHub Actions
+- container supply chain security
+- Kubernetes deployment workflows
+- secret management
+- container image signing
+- SBOM generation
+- security gates before deployment
 
-## Repo Structure
+This repository is intended as a hands-on DevOps / DevSecOps portfolio project.
 
+**Tech stack:**
+
+- Python / Flask
+- Docker
+- Kubernetes
+- Helm
+- GitHub Actions
+- Semgrep
+- Trivy
+- Cosign
+- Dependabot
+- SBOM
+
+---
+
+# Architecture
+
+## High-level flow
+
+```text
+GitHub Actions
+   ↓
+Lint/Test
+   ↓
+Semgrep SAST
+   ↓
+Helm Lint
+   ↓
+Build Docker Images
+   ↓
+Trivy Scan
+   ↓
+Push to GHCR
+   ↓
+Cosign Sign
+   ↓
+Release-ready signed images
+   ├── Manual SBOM Generation
+   ├── Manual Secret Creation
+   └── Helm Deploy to Kubernetes
 ```
+
+## Service architecture
+
+```text
+services
+   ├── auth-service
+   ├── api-service
+   ├── products-service
+   └── inventory-service
+```
+
+---
+
+# Microservices
+
+| Service | Description | Tech Stack | Port |
+|---|---|---|---|
+| auth-service | Authentication logic | Flask | 5001 |
+| api-service | Main API gateway | Flask | 5002 |
+| products-service | Product catalog management | Flask + PostgreSQL | 5003 |
+| inventory-service | Inventory state management | Flask + Redis | 5004 |
+
+Each service contains:
+
+- dedicated Dockerfile
+- isolated requirements
+- unit/integration tests
+
+---
+
+# Infrastructure & Orchestration
+
+## Containerization
+- Docker images built per service.
+
+## Image registry
+- GitHub Container Registry (GHCR).
+
+## Orchestration
+- Kubernetes.
+
+Supported local clusters:
+
+- kind
+- minikube
+
+## Deployment
+- Helm charts located in:
+
+```bash
+infrastructure/helm/secure-pipeline/
+```
+
+## External dependencies
+- PostgreSQL
+- Redis
+
+---
+
+# CI/CD Pipeline
+
+Implemented with:
+
+```bash
+.github/workflows/ci.yml
+```
+
+## Pipeline jobs
+
+### Validation jobs
+- lint-test
+- semgrep
+- helm-lint
+
+### Build/security jobs
+- build-and-scan-images
+- sign-images
+
+### Manual operational jobs
+- create-secrets
+- deploy
+- sbom
+
+---
+
+# Pipeline Flow
+
+## Pull Request workflow
+
+Runs automatically on PR:
+
+1. lint-test
+2. semgrep
+3. helm-lint
+
+Purpose:
+
+- validate code quality
+- run tests
+- run SAST
+- validate Helm charts
+
+No images are built or deployed.
+
+---
+
+## Push to main workflow
+
+Runs automatically on merge/push to `main`:
+
+1. lint-test
+2. semgrep
+3. helm-lint
+4. build-and-scan-images
+5. sign-images
+
+Purpose:
+
+- build release-ready images
+- vulnerability scan
+- publish signed images to GHCR
+
+---
+
+## Manual workflows
+
+Triggered via `workflow_dispatch`.
+
+### create-secrets
+Creates Kubernetes secrets from GitHub Secrets.
+
+### deploy
+Deploys services via Helm.
+
+### sbom
+Generates SBOM artifacts for all images.
+
+This separation avoids automatic deployments during active development.
+
+---
+
+# Security Controls
+
+## Static Analysis (SAST)
+
+Using **Semgrep**.
+
+Rules include:
+
+- blocking `eval()`
+- blocking dangerous subprocess patterns
+
+---
+
+## Container Vulnerability Scanning
+
+Using **Trivy**.
+
+Pipeline fails on:
+
+- HIGH vulnerabilities
+- CRITICAL vulnerabilities
+
+with:
+
+```bash
+--exit-code 1
+```
+
+---
+
+## Dependency Management
+
+Using **Dependabot** for automated dependency update monitoring.
+
+Purpose:
+
+- detect outdated dependencies
+- receive automated update PRs
+- reduce exposure to known vulnerable packages
+
+## Image Signing
+Using **Cosign** keyless signing.
+
+Purpose:
+
+- supply chain integrity
+- provenance verification
+
+---
+
+## SBOM Generation
+
+Using Anchore SBOM action.
+
+Artifacts generated in SPDX JSON format.
+
+Purpose:
+
+- dependency transparency
+- auditability
+
+---
+
+## Secret Management
+
+Secrets are not committed.
+
+Sensitive values are injected from GitHub Secrets into Kubernetes Secrets.
+
+Examples:
+
+- PRODUCTS_DB_HOST
+- PRODUCTS_DB_PORT
+- PRODUCTS_DB_NAME
+- PRODUCTS_DB_USER
+- PRODUCTS_DB_PASSWORD
+
+---
+
+## Secure Containers
+
+All services:
+
+- run as non-root users
+- use slim Python base images
+
+---
+
+These controls implement a layered DevSecOps pipeline covering:
+
+- application security (SAST)
+- dependency security (Dependabot + SBOM)
+- container security (Trivy)
+- supply chain integrity (Cosign signing)
+- secure deployment practices (Kubernetes + Secrets management)
+- runtime security testing (planned with OWASP ZAP)
+
+---
+
+# Local Development
+
+## Requirements
+
+- Docker
+- Docker Compose
+- Python 3.12
+
+---
+
+## Start services locally
+
+```bash
+docker-compose up --build
+```
+
+---
+
+## Run tests
+
+Example:
+
+```bash
+pytest services/products-service/tests
+```
+
+---
+
+## Environment variables
+
+Local development uses:
+
+```bash
+.env
+```
+
+Production uses:
+
+- GitHub Secrets
+- Kubernetes Secrets
+
+---
+
+# Deployment Guide
+
+## Local Kubernetes deployment
+
+Supported:
+
+- kind
+- minikube
+
+Deploy manually:
+
+1. Run `create-secrets`
+2. Run `deploy`
+
+---
+
+## Notes
+
+GitHub-hosted runners cannot access local clusters.
+
+For real deployment, adapt to:
+
+- AWS EKS
+- GKE
+- AKS
+
+and provide:
+
+- kubeconfig
+- reachable cluster
+
+---
+
+# Testing
+
+Each service contains dedicated tests.
+
+Current testing:
+
+- unit tests
+- integration-like API tests using Flask test client
+- mocked Redis/Postgres dependencies
+
+Security testing:
+
+- Semgrep
+- Trivy
+
+---
+
+# Repository Structure
+
+```bash
 services/
   auth-service/
   api-service/
+  products-service/
+  inventory-service/
+
 infrastructure/
   helm/
+    secure-pipeline/
   kubernetes/
-.github/workflows/
+
+.github/
+  workflows/
+    ci.yml
+  dependabot.yml
+
+docker-compose.yml
+.semgrep.yml
+README.md
+LICENSE
 ```
 
-*This README is a work in progress and will be updated as the project evolves.*
+---
+
+# Roadmap
+
+## Completed
+
+- [x] Multi-service Flask architecture
+- [x] Dockerized services
+- [x] GitHub Actions CI/CD
+- [x] Semgrep SAST
+- [x] Trivy image scanning
+- [x] GHCR image publishing
+- [x] Cosign image signing
+- [x] Helm deployment
+- [x] Kubernetes secret management
+- [x] SBOM generation
+
+---
+
+## Planned Improvements
+
+### Dynamic Application Security Testing (DAST)
+Planned integration of **OWASP ZAP**.
+
+Future workflow:
+
+```text
+Deploy test environment
+   ↓
+Run OWASP ZAP baseline/full scan
+   ↓
+Fail pipeline on detected issues
+```
+
+Planned checks:
+
+- XSS
+- SQL injection
+- insecure headers
+- authentication issues
+
+---
+
+### Kubernetes Admission Security
+
+Future integration:
+
+- signature verification before deploy
+- admission policies
+
+Possible tooling:
+
+- Cosign verify
+- Kyverno / admission controller policies
+
+---
+
+# References
+
+- GitHub Actions: https://docs.github.com/en/actions
+- Kubernetes: https://kubernetes.io/docs/
+- Helm: https://helm.sh/docs/
+- Semgrep: https://semgrep.dev/
+- Trivy: https://aquasecurity.github.io/trivy/
+- Cosign: https://docs.sigstore.dev/cosign/signing/overview/
+- OWASP ZAP: https://www.zaproxy.org/
+- Dependabot: https://docs.github.com/en/code-security/dependabot
