@@ -246,9 +246,11 @@ jobs:
             --set authService.image.repository=ghcr.io/${{ env.OWNER }}/auth-service \
             --set apiService.image.repository=ghcr.io/${{ env.OWNER }}/api-service \
             --set productsService.image.repository=ghcr.io/${{ env.OWNER }}/products-service \
+            --set inventoryService.image.repository=ghcr.io/${{ env.OWNER }}/inventory-service \
             --set authService.image.tag=ci \
             --set apiService.image.tag=ci \
-            --set productsService.image.tag=ci
+            --set productsService.image.tag=ci \
+            --set inventoryService.image.tag=ci
 
   sbom:
     runs-on: ubuntu-latest
