@@ -121,6 +121,13 @@ jobs:
           load: true
           tags: products-service:ci
 
+      - name: Build inventory-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/inventory-service
+          load: true
+          tags: inventory-service:ci
+
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -139,11 +146,15 @@ jobs:
       - name: Scan products-service image
         run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed products-service:ci
 
+      - name: Scan inventory-service image
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed inventory-service:ci
+
       - name: Tag images for GHCR
         run: |
           docker tag auth-service:ci ghcr.io/${{ env.OWNER }}/auth-service:ci
           docker tag api-service:ci ghcr.io/${{ env.OWNER }}/api-service:ci
           docker tag products-service:ci ghcr.io/${{ env.OWNER }}/products-service:ci
+          docker tag inventory-service:ci ghcr.io/${{ env.OWNER }}/inventory-service:ci
 
       - name: Push images to GHCR
         if: github.ref == 'refs/heads/main'
@@ -151,6 +162,7 @@ jobs:
           docker push ghcr.io/${{ env.OWNER }}/auth-service:ci
           docker push ghcr.io/${{ env.OWNER }}/api-service:ci
           docker push ghcr.io/${{ env.OWNER }}/products-service:ci
+          docker push ghcr.io/${{ env.OWNER }}/inventory-service:ci
 
   sign-images:
     runs-on: ubuntu-latest
@@ -182,6 +194,9 @@ jobs:
 
       - name: Sign products-service image (keyless)
         run: cosign sign --yes ghcr.io/${{ env.OWNER }}/products-service:ci
+      
+      - name: Sign inventory-service image (keyless)
+        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/inventory-service:ci
 
   create-secrets:
     runs-on: ubuntu-latest
@@ -264,6 +279,9 @@ jobs:
       - name: Pull products-service image
         run: docker pull ghcr.io/${{ env.OWNER }}/products-service:ci
 
+      - name: Pull inventory-service image
+        run: docker pull ghcr.io/${{ env.OWNER }}/inventory-service:ci
+
       - name: Generate SBOM for auth-service
         uses: anchore/sbom-action@v0.16.0
         with:
@@ -285,6 +303,13 @@ jobs:
           format: spdx-json
           output-file: products-service-sbom.spdx.json
 
+      - name: Generate SBOM for inventory-service
+        uses: anchore/sbom-action@v0.16.0
+        with:
+          image: ghcr.io/${{ env.OWNER }}/inventory-service:ci
+          format: spdx-json
+          output-file: inventory-service-sbom.spdx.json
+
       - name: Upload SBOMs
         uses: actions/upload-artifact@v4
         with:
@@ -293,3 +318,4 @@ jobs:
             auth-service-sbom.spdx.json
             api-service-sbom.spdx.json
             products-service-sbom.spdx.json
+            inventory-service-sbom.spdx.json
