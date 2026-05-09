@@ -12,13 +12,13 @@ class FakeRedis:
         self.store[key] = str(value)
 
 
-def test_inventory_crud():
+def test_inventory_crud(monkeypatch):
     fake_redis = FakeRedis()
 
     def fake_get_redis_client():
         return fake_redis
 
-    inventory_app.get_redis_client = fake_get_redis_client
+    monkeypatch.setattr(inventory_app, "get_redis_client", fake_get_redis_client)
 
     client = inventory_app.app.test_client()
 
