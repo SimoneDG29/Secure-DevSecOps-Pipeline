@@ -31,6 +31,10 @@ jobs:
         run: |
           pip install -r services/products-service/requirements.txt -r services/products-service/requirements-dev.txt
 
+      - name: Install inventory-service deps
+        run: |
+          pip install -r services/inventory-service/requirements.txt -r services/inventory-service/requirements-dev.txt
+
       - name: Run auth-service tests
         run: pytest services/auth-service/tests
 
@@ -39,6 +43,9 @@ jobs:
 
       - name: Run products-service tests
         run: pytest services/products-service/tests
+
+      - name: Run inventory-service tests
+        run: pytest services/inventory-service/tests
 
   semgrep:
     runs-on: ubuntu-latest
