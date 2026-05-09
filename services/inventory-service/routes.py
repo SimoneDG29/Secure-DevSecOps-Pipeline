@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from redis_client import get_redis_client
+import redis_client
 
 
 def register_routes(app):
@@ -11,14 +11,14 @@ def register_routes(app):
         if not isinstance(quantity, int) or quantity < 0:
             return jsonify(error="quantity must be a non-negative integer"), 400
 
-        client = get_redis_client()
+        client = redis_client.get_redis_client()
         client.set(f"inventory:{sku}", quantity)
 
         return jsonify(sku=sku, quantity=quantity), 200
 
     @app.get("/inventory/<sku>")
     def get_inventory(sku):
-        client = get_redis_client()
+        client = redis_client.get_redis_client()
         value = client.get(f"inventory:{sku}")
 
         if value is None:

@@ -1,5 +1,5 @@
 import app as inventory_app
-
+import redis_client
 
 class FakeRedis:
     def __init__(self):
@@ -11,14 +11,13 @@ class FakeRedis:
     def set(self, key, value):
         self.store[key] = str(value)
 
-
 def test_inventory_crud(monkeypatch):
     fake_redis = FakeRedis()
 
     def fake_get_redis_client():
         return fake_redis
 
-    monkeypatch.setattr(inventory_app, "get_redis_client", fake_get_redis_client)
+    monkeypatch.setattr(redis_client, "get_redis_client", fake_get_redis_client, raising=False)
 
     client = inventory_app.app.test_client()
 
@@ -32,3 +31,7 @@ def test_inventory_crud(monkeypatch):
 
     missing = client.get("/inventory/missing")
     assert missing.status_code == 404
+
+    bad = client.post("/inventory/sku-123", json={"quantity": -1})
+    assert bad.status_code == 400
+    assert bad.get_json()["error"]
