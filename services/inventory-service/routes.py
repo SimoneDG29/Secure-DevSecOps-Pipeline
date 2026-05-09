@@ -16,6 +16,16 @@ def register_routes(app):
 
         return jsonify(sku=sku, quantity=quantity), 200
 
+    @app.get("/inventory/<sku>")
+    def get_inventory(sku):
+        client = get_redis_client()
+        value = client.get(f"inventory:{sku}")
+
+        if value is None:
+            return jsonify(error="not found"), 404
+
+        return jsonify(sku=sku, quantity=int(value)), 200
+
     @app.get("/healthz")
     def healthz():
         return jsonify(status="ok"), 200
