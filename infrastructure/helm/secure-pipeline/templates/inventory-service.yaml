@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-inventory-service
+  labels:
+    app: inventory-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.inventoryService.replicaCount }}
+  selector:
+    matchLabels:
+      app: inventory-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: inventory-service
+          image: "{{ .Values.inventoryService.image.repository }}:{{ .Values.inventoryService.image.tag }}"
+          imagePullPolicy: {{ .Values.inventoryService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.inventoryService.service.port }}
+          env:
+            - name: REDIS_HOST
+              value: {{ .Values.inventoryService.env.redisHost | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.inventoryService.env.redisPort | quote }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.inventoryService.probes.readiness.path }}
+              port: {{ .Values.inventoryService.service.port }}
+            initialDelaySeconds: {{ .Values.inventoryService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.inventoryService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.inventoryService.probes.liveness.path }}
+              port: {{ .Values.inventoryService.service.port }}
+            initialDelaySeconds: {{ .Values.inventoryService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.inventoryService.probes.liveness.periodSeconds }}
+          resources:
+            requests:
+              cpu: {{ .Values.inventoryService.resources.requests.cpu | quote }}
+              memory: {{ .Values.inventoryService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.inventoryService.resources.limits.cpu | quote }}
+              memory: {{ .Values.inventoryService.resources.limits.memory | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-inventory-service
+  labels:
+    app: inventory-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: inventory-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.inventoryService.service.port }}
+      targetPort: {{ .Values.inventoryService.service.port }}
+  type: ClusterIP

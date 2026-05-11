@@ -1,6 +1,6 @@
 apiVersion: v2
 name: secure-pipeline
-description: Helm chart for auth-service, api-service, and products-service
+description: Helm chart for microservices in the secure pipeline
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
