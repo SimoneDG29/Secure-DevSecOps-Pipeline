@@ -1,7 +1,6 @@
 from flask import jsonify, request
 from db import get_db_connection
 from werkzeug.security import generate_password_hash, check_password_hash
-from app import app
 
 
 def register_routes(app):
