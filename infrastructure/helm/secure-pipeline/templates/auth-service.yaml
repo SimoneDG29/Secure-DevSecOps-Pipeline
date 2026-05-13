@@ -23,6 +23,9 @@ spec:
           imagePullPolicy: {{ .Values.authService.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.authService.service.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.authService.secretRef.name }}
           readinessProbe:
             httpGet:
               path: {{ .Values.authService.probes.readiness.path }}
