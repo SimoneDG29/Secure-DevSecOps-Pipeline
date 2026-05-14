@@ -6,6 +6,8 @@ authService:
     pullPolicy: IfNotPresent
   service:
     port: 5001
+  secretRef:
+    name: products-db-secret
   probes:
     readiness:
       path: /healthz
