@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AuthPage from "./pages/AuthPage";
 import ProductsPage from "./pages/ProductsPage";
+import InventoryPage from "./pages/InventoryPage";
 
 function App() {
   const [page, setPage] = useState("auth");
@@ -14,7 +15,7 @@ function App() {
       </nav>
       {page === "auth" && <AuthPage />}
       {page === "products" && <ProductsPage />}
-      {page === "inventory" && <div>Inventory page coming soon…</div>}
+      {page === "inventory" && <InventoryPage />}
     </div>
   );
 }
