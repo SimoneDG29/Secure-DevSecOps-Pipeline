@@ -3,6 +3,10 @@ from flask import Flask
 from routes import register_routes
 
 app = Flask(__name__)
+CORS(
+    app,
+    resources={r"/*": {"origins": ["http://localhost:5173"]}}
+)
 
 register_routes(app)
 
