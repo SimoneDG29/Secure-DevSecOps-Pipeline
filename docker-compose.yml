@@ -37,6 +37,17 @@ services:
     depends_on:
       - postgres
 
+  frontend-service:
+    build:
+      context: ./services/frontend-service
+    ports:
+      - "5173:80"
+    depends_on:
+      - auth-service
+      - api-service
+      - products-service
+      - inventory-service
+
   inventory-service:
     build:
       context: ./services/inventory-service
