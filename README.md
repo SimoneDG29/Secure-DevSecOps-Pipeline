@@ -35,7 +35,7 @@ The main goal is to demonstrate:
 - secret management
 - container image signing
 - SBOM generation
-- security gates before deployment
+- layered security gates before deployment
 
 This repository is intended as a hands-on DevOps / DevSecOps portfolio project.
 
@@ -64,6 +64,8 @@ GitHub Actions
 Lint/Test
    ↓
 Semgrep SAST
+   ↓
+Dependency Scan (Trivy FS)
    ↓
 Helm Lint
    ↓
@@ -152,6 +154,7 @@ Implemented with:
 ### Validation jobs
 - lint-test
 - semgrep
+- dependency-scan
 - helm-lint
 
 ### Build/security jobs
@@ -173,13 +176,15 @@ Runs automatically on PR:
 
 1. lint-test
 2. semgrep
-3. helm-lint
+3. dependency-scan
+4. helm-lint
 
 Purpose:
 
 - validate code quality
 - run tests
 - run SAST
+- scan project dependencies before container builds
 - validate Helm charts
 
 No images are built or deployed.
@@ -192,9 +197,10 @@ Runs automatically on merge/push to `main`:
 
 1. lint-test
 2. semgrep
-3. helm-lint
-4. build-and-scan-images
-5. sign-images
+3. dependency-scan
+4. helm-lint
+5. build-and-scan-images
+6. sign-images
 
 Purpose:
 
@@ -234,9 +240,37 @@ Rules include:
 
 ---
 
-## Container Vulnerability Scanning
+## Vulnerability Scanning
 
-Using **Trivy**.
+Using **Trivy** in two stages.
+
+### Dependency scanning (filesystem scan)
+
+Runs before Docker image builds.
+
+Purpose:
+
+- detect vulnerable dependencies early
+- fail fast before container builds
+- reduce CI/CD resource waste
+
+Scans include:
+
+- Python requirements
+- npm packages
+- lockfiles
+
+---
+
+### Container image scanning
+
+Runs after Docker image builds.
+
+Purpose:
+
+- scan final runtime images
+- detect OS-level vulnerabilities
+- validate container security posture
 
 Pipeline fails on:
 
@@ -312,7 +346,7 @@ All services:
 These controls implement a layered DevSecOps pipeline covering:
 
 - application security (SAST)
-- dependency security (Dependabot + SBOM)
+- dependency security (Trivy FS + Dependabot + SBOM)
 - container security (Trivy)
 - supply chain integrity (Cosign signing)
 - secure deployment practices (Kubernetes + Secrets management)
@@ -448,6 +482,7 @@ LICENSE
 - [x] Dockerized services
 - [x] GitHub Actions CI/CD
 - [x] Semgrep SAST
+- [x] Early dependency vulnerability scanning
 - [x] Trivy image scanning
 - [x] GHCR image publishing
 - [x] Cosign image signing
