@@ -90,7 +90,8 @@ services
    ├── auth-service
    ├── api-service
    ├── products-service
-   └── inventory-service
+   ├── inventory-service
+   └── frontend-service
 ```
 
 ---
@@ -103,6 +104,7 @@ services
 | api-service | Main API gateway | Flask | 5002 |
 | products-service | Product catalog management | Flask + PostgreSQL | 5003 |
 | inventory-service | Inventory state management | Flask + Redis | 5004 |
+| frontend-service | React/Vite frontend UI | React + Vite + Nginx | 5173 |
 
 Each service contains:
 
@@ -455,6 +457,7 @@ services/
   api-service/
   products-service/
   inventory-service/
+  frontend-service/
 
 infrastructure/
   helm/
