@@ -1,21 +1,16 @@
-from flask import Flask, jsonify
+from db import init_db
+from flask import Flask
+from flask_cors import CORS
+from routes import register_routes
 
 app = Flask(__name__)
+CORS(
+    app,
+    resources={r"/*": {"origins": ["http://localhost:5173"]}}
+)
 
-@app.route('/auth', methods=['POST'])
-def authenticate():
-    """
-    A simple placeholder for an authentication endpoint.
-    In a real application, this would handle user credentials.
-    """
-    return jsonify({"message": "User authenticated successfully"}), 200
+register_routes(app)
 
-@app.route('/healthz', methods=['GET'])
-def health_check():
-    """
-    A simple health check endpoint.
-    """
-    return jsonify({"status": "ok"}), 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=5001)

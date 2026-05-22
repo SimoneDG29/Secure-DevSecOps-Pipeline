@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-frontend-service
+  labels:
+    app: frontend-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.frontendService.replicaCount }}
+  selector:
+    matchLabels:
+      app: frontend-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: frontend-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: frontend-service
+          image: "{{ .Values.frontendService.image.repository }}:{{ .Values.frontendService.image.tag }}"
+          imagePullPolicy: {{ .Values.frontendService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.frontendService.service.port }}
+          resources:
+            requests:
+              cpu: {{ .Values.frontendService.resources.requests.cpu | quote }}
+              memory: {{ .Values.frontendService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.frontendService.resources.limits.cpu | quote }}
+              memory: {{ .Values.frontendService.resources.limits.memory | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-frontend-service
+  labels:
+    app: frontend-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: frontend-service
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.frontendService.service.port }}
+      targetPort: {{ .Values.frontendService.service.port }}
+  type: ClusterIP

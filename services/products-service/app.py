@@ -1,8 +1,13 @@
 from db import init_db
 from flask import Flask
+from flask_cors import CORS
 from routes import register_routes
 
 app = Flask(__name__)
+CORS(
+    app,
+    resources={r"/*": {"origins": ["http://localhost:5173"]}}
+)
 
 register_routes(app)
 

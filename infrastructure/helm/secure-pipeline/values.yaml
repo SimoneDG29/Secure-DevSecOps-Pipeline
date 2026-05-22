@@ -1,11 +1,13 @@
 authService:
   replicaCount: 1
   image:
-    repository: ghcr.io/your-username/auth-service
+    repository: ghcr.io/auth-service
     tag: ci
     pullPolicy: IfNotPresent
   service:
     port: 5001
+  secretRef:
+    name: products-db-secret
   probes:
     readiness:
       path: /healthz
@@ -26,7 +28,7 @@ authService:
 productsService:
   replicaCount: 1
   image:
-    repository: ghcr.io/your-username/products-service
+    repository: ghcr.io/products-service
     tag: ci
     pullPolicy: IfNotPresent
   service:
@@ -53,7 +55,7 @@ productsService:
 inventoryService:
   replicaCount: 1
   image:
-    repository: ghcr.io/your-username/inventory-service
+    repository: ghcr.io/inventory-service
     tag: ci
     pullPolicy: IfNotPresent
   service:
@@ -78,13 +80,29 @@ inventoryService:
       cpu: "250m"
       memory: "256Mi"
 
+frontendService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/frontend-service
+    tag: ci
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
 postgresql:
   enabled: false
 
 apiService:
   replicaCount: 1
   image:
-    repository: ghcr.io/your-username/api-service
+    repository: ghcr.io/api-service
     tag: ci
     pullPolicy: IfNotPresent
   service:

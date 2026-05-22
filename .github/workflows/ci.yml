@@ -64,6 +64,31 @@ jobs:
       - name: Run Semgrep (fail on invalid rules)
         run: semgrep --config .semgrep.yml --error --strict
 
+  dependency-scan:
+    runs-on: ubuntu-latest
+    needs: [lint-test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Scan repository dependencies
+        run: |
+          trivy fs . \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --ignore-unfixed
+
   helm-lint:
     runs-on: ubuntu-latest
     steps:
@@ -78,7 +103,7 @@ jobs:
 
   build-and-scan-images:
     runs-on: ubuntu-latest
-    needs: [lint-test, semgrep, helm-lint]
+    needs: [lint-test, semgrep, helm-lint, dependency-scan]
     if: github.event_name == 'push'
     permissions:
       contents: read
@@ -128,6 +153,13 @@ jobs:
           load: true
           tags: inventory-service:ci
 
+      - name: Build frontend-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/frontend-service
+          load: true
+          tags: frontend-service:ci
+
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -149,12 +181,16 @@ jobs:
       - name: Scan inventory-service image
         run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed inventory-service:ci
 
+      - name: Scan frontend-service image
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed frontend-service:ci
+
       - name: Tag images for GHCR
         run: |
           docker tag auth-service:ci ghcr.io/${{ env.OWNER }}/auth-service:ci
           docker tag api-service:ci ghcr.io/${{ env.OWNER }}/api-service:ci
           docker tag products-service:ci ghcr.io/${{ env.OWNER }}/products-service:ci
           docker tag inventory-service:ci ghcr.io/${{ env.OWNER }}/inventory-service:ci
+          docker tag frontend-service:ci ghcr.io/${{ env.OWNER }}/frontend-service:ci
 
       - name: Push images to GHCR
         if: github.ref == 'refs/heads/main'
@@ -163,6 +199,7 @@ jobs:
           docker push ghcr.io/${{ env.OWNER }}/api-service:ci
           docker push ghcr.io/${{ env.OWNER }}/products-service:ci
           docker push ghcr.io/${{ env.OWNER }}/inventory-service:ci
+          docker push ghcr.io/${{ env.OWNER }}/frontend-service:ci
 
   sign-images:
     runs-on: ubuntu-latest
@@ -197,6 +234,9 @@ jobs:
       
       - name: Sign inventory-service image (keyless)
         run: cosign sign --yes ghcr.io/${{ env.OWNER }}/inventory-service:ci
+
+      - name: Sign frontend-service image (keyless)
+        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/frontend-service:ci
 
   create-secrets:
     runs-on: ubuntu-latest
@@ -247,10 +287,12 @@ jobs:
             --set apiService.image.repository=ghcr.io/${{ env.OWNER }}/api-service \
             --set productsService.image.repository=ghcr.io/${{ env.OWNER }}/products-service \
             --set inventoryService.image.repository=ghcr.io/${{ env.OWNER }}/inventory-service \
+            --set frontendService.image.repository=ghcr.io/${{ env.OWNER }}/frontend-service \
             --set authService.image.tag=ci \
             --set apiService.image.tag=ci \
             --set productsService.image.tag=ci \
-            --set inventoryService.image.tag=ci
+            --set inventoryService.image.tag=ci \
+            --set frontendService.image.tag=ci
 
   sbom:
     runs-on: ubuntu-latest
@@ -284,6 +326,9 @@ jobs:
       - name: Pull inventory-service image
         run: docker pull ghcr.io/${{ env.OWNER }}/inventory-service:ci
 
+      - name: Pull frontend-service image
+        run: docker pull ghcr.io/${{ env.OWNER }}/frontend-service:ci
+
       - name: Generate SBOM for auth-service
         uses: anchore/sbom-action@v0.16.0
         with:
@@ -312,6 +357,13 @@ jobs:
           format: spdx-json
           output-file: inventory-service-sbom.spdx.json
 
+      - name: Generate SBOM for frontend-service
+        uses: anchore/sbom-action@v0.16.0
+        with:
+          image: ghcr.io/${{ env.OWNER }}/frontend-service:ci
+          format: spdx-json
+          output-file: frontend-service-sbom.spdx.json
+
       - name: Upload SBOMs
         uses: actions/upload-artifact@v4
         with:
@@ -321,3 +373,4 @@ jobs:
             api-service-sbom.spdx.json
             products-service-sbom.spdx.json
             inventory-service-sbom.spdx.json
+            frontend-service-sbom.spdx.json
