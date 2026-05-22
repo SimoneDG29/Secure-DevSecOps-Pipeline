@@ -261,7 +261,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: [helm-lint, create-secrets]
+    needs: [helm-lint, create-secrets, build-and-scan-images, sign-images]
     if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
