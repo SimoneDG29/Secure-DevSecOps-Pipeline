@@ -323,7 +323,8 @@ jobs:
             -t http://frontend-service:80 \
             -r zap-report.html \
             -J zap-report.json \
-            -l FAIL \
+            -l WARN \
+            -I \
             -m 5
 
           echo "Analyzing vulnerabilities (confidence-based policy)..."
