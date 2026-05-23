@@ -263,6 +263,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-scan-images
     if: github.event_name == 'push'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -291,35 +292,38 @@ jobs:
 
       - name: Wait for frontend readiness
         run: |
-          for i in {1..30}; do
-            if curl -fs http://localhost:8080 > /dev/null; then
+          for i in {1..40}; do
+            if curl -fs http://localhost:5173 > /dev/null; then
               echo "Frontend is up"
-              break
+              exit 0
             fi
             echo "Waiting for frontend..."
             sleep 3
           done
 
-          # fail-safe check
-          curl -fs http://localhost:8080 || (
-            echo "Frontend not reachable"
-            docker compose logs
-            exit 1
-          )
+          echo "Frontend not reachable"
+          docker compose logs
+          exit 1
 
       - name: Run OWASP ZAP Full Scan (DAST)
         run: |
           set -e
 
+          chmod -R 777 ${{ github.workspace }}
+
+          NETWORK_NAME=$(docker network ls --format '{{.Name}}' | grep default | head -n 1)
+
+          echo "Using Docker network: $NETWORK_NAME"
+
           docker run --rm \
-            --network host \
-            -v $(pwd):/zap/wrk \
+            --network "$NETWORK_NAME" \
+            -v ${{ github.workspace }}:/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-full-scan.py \
-            -t http://localhost:8080 \
+            -t http://frontend-service:80 \
             -r zap-report.html \
             -J zap-report.json \
-            -l MEDIUM \
+            -l FAIL \
             -m 5
 
           echo "Analyzing vulnerabilities (confidence-based policy)..."
@@ -330,7 +334,6 @@ jobs:
           echo "HIGH confidence vulns: $HIGH_CONF_COUNT"
           echo "MEDIUM confidence vulns: $MED_CONF_COUNT"
 
-          # SECURITY GATE
           if [ "$HIGH_CONF_COUNT" -gt 0 ]; then
             echo "❌ SECURITY FAIL: High confidence High/Critical vulnerabilities found"
             exit 1
