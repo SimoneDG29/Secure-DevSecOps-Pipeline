@@ -21,6 +21,25 @@ spec:
         - name: frontend-service
           image: "{{ .Values.frontendService.image.repository }}:{{ .Values.frontendService.image.tag }}"
           imagePullPolicy: {{ .Values.frontendService.image.pullPolicy }}
+          securityContext:
+            runAsNonRoot: {{ .Values.frontendService.securityContext.runAsNonRoot }}
+            allowPrivilegeEscalation: {{ .Values.frontendService.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.frontendService.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontendService.probes.readiness.path }}
+              port: {{ .Values.frontendService.service.port }}
+            initialDelaySeconds: {{ .Values.frontendService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontendService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontendService.probes.liveness.path }}
+              port: {{ .Values.frontendService.service.port }}
+            initialDelaySeconds: {{ .Values.frontendService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontendService.probes.liveness.periodSeconds }}
           ports:
             - containerPort: {{ .Values.frontendService.service.port }}
           resources:
@@ -30,6 +49,21 @@ spec:
             limits:
               cpu: {{ .Values.frontendService.resources.limits.cpu | quote }}
               memory: {{ .Values.frontendService.resources.limits.memory | quote }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+
 ---
 apiVersion: v1
 kind: Service

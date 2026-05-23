@@ -8,6 +8,13 @@ authService:
     port: 5001
   secretRef:
     name: products-db-secret
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   probes:
     readiness:
       path: /healthz
@@ -35,6 +42,13 @@ productsService:
     port: 5003
   secretRef:
     name: products-db-secret
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   probes:
     readiness:
       path: /healthz
@@ -63,6 +77,13 @@ inventoryService:
   env:
     redisHost: redis
     redisPort: "6379"
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   probes:
     readiness:
       path: /healthz
@@ -88,6 +109,22 @@ frontendService:
     pullPolicy: IfNotPresent
   service:
     port: 80
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+  probes:
+    readiness:
+      path: /
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /
+      initialDelaySeconds: 10
+      periodSeconds: 15
   resources:
     requests:
       cpu: "100m"
@@ -107,6 +144,13 @@ apiService:
     pullPolicy: IfNotPresent
   service:
     port: 5002
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   probes:
     readiness:
       path: /healthz

@@ -23,6 +23,13 @@ spec:
           imagePullPolicy: {{ .Values.apiService.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.apiService.service.port }}
+          securityContext:
+            runAsNonRoot: {{ .Values.apiService.securityContext.runAsNonRoot }}
+            allowPrivilegeEscalation: {{ .Values.apiService.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.apiService.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                - ALL
           readinessProbe:
             httpGet:
               path: {{ .Values.apiService.probes.readiness.path }}

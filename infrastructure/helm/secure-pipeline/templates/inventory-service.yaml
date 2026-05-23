@@ -28,6 +28,13 @@ spec:
               value: {{ .Values.inventoryService.env.redisHost | quote }}
             - name: REDIS_PORT
               value: {{ .Values.inventoryService.env.redisPort | quote }}
+          securityContext:
+            runAsNonRoot: {{ .Values.inventoryService.securityContext.runAsNonRoot }}
+            allowPrivilegeEscalation: {{ .Values.inventoryService.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.inventoryService.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                - ALL
           readinessProbe:
             httpGet:
               path: {{ .Values.inventoryService.probes.readiness.path }}

@@ -26,6 +26,13 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.productsService.secretRef.name }}
+          securityContext:
+            runAsNonRoot: {{ .Values.authService.securityContext.runAsNonRoot }}
+            allowPrivilegeEscalation: {{ .Values.authService.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.authService.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                - ALL
           readinessProbe:
             httpGet:
               path: {{ .Values.authService.probes.readiness.path }}
