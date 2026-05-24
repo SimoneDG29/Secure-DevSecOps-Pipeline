@@ -49,6 +49,7 @@ This repository is intended as a hands-on DevOps / DevSecOps portfolio project.
 - Semgrep
 - Trivy
 - Cosign
+- OWASP ZAP
 - Dependabot
 - SBOM
 
@@ -76,6 +77,8 @@ Trivy Scan
 Push to GHCR
    ↓
 Cosign Sign
+   ↓
+OWASP ZAP Full Scan (DAST)
    ↓
 Release-ready signed images
    ├── Manual SBOM Generation
@@ -162,6 +165,7 @@ Implemented with:
 ### Build/security jobs
 - build-and-scan-images
 - sign-images
+- zap-dast
 
 ### Manual operational jobs
 - create-secrets
@@ -203,12 +207,14 @@ Runs automatically on merge/push to `main`:
 4. helm-lint
 5. build-and-scan-images
 6. sign-images
+7. zap-dast
 
 Purpose:
 
 - build release-ready images
 - vulnerability scan
 - publish signed images to GHCR
+- run DAST (OWASP ZAP) before deployment
 
 ---
 
@@ -307,6 +313,24 @@ Purpose:
 
 ---
 
+## Dynamic Application Security Testing (DAST)
+
+Using **OWASP ZAP** in CI pipeline.
+
+The pipeline includes a full-stack DAST scan executed after deployment in Docker Compose.
+
+### Features
+
+- Full application scan of running environment
+- Fail pipeline on:
+  - High confidence HIGH/CRITICAL findings
+  - Excessive medium-confidence vulnerabilities
+- Reports generated in:
+  - HTML format (`zap-report.html`)
+  - JSON format (`zap-report.json`)
+
+---
+
 ## SBOM Generation
 
 Using Anchore SBOM action.
@@ -352,7 +376,7 @@ These controls implement a layered DevSecOps pipeline covering:
 - container security (Trivy)
 - supply chain integrity (Cosign signing)
 - secure deployment practices (Kubernetes + Secrets management)
-- runtime security testing (planned with OWASP ZAP)
+- runtime security testing (OWASP ZAP)
 
 ---
 
@@ -446,6 +470,7 @@ Security testing:
 
 - Semgrep
 - Trivy
+- OWASP ZAP
 
 ---
 
@@ -492,32 +517,11 @@ LICENSE
 - [x] Helm deployment
 - [x] Kubernetes secret management
 - [x] SBOM generation
+- [x] OWASP ZAP DAST
 
 ---
 
 ## Planned Improvements
-
-### Dynamic Application Security Testing (DAST)
-Planned integration of **OWASP ZAP**.
-
-Future workflow:
-
-```text
-Deploy test environment
-   ↓
-Run OWASP ZAP baseline/full scan
-   ↓
-Fail pipeline on detected issues
-```
-
-Planned checks:
-
-- XSS
-- SQL injection
-- insecure headers
-- authentication issues
-
----
 
 ### Kubernetes Admission Security
 
