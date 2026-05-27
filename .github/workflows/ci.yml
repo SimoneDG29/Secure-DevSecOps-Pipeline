@@ -25,6 +25,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            services/${{ matrix.service }}/requirements.txt
+            services/${{ matrix.service }}/requirements-dev.txt
 
       - name: Install dependencies
         run: |
@@ -68,7 +72,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
 
+      - name: Restore Trivy cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-${{ runner.os }}
+          restore-keys: |
+            trivy-${{ runner.os }}
+
       - name: Scan repository dependencies
+        env:
+          TRIVY_CACHE_DIR: ~/.cache/trivy
         run: |
           trivy fs . \
             --scanners vuln \
@@ -127,6 +141,8 @@ jobs:
           context: ./services/${{ matrix.service }}
           load: true
           tags: ${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
       - name: Install Trivy
         run: |
@@ -137,7 +153,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
 
+      - name: Restore Trivy DB cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ runner.os }}
+          restore-keys: |
+            trivy-db-${{ runner.os }}
+
       - name: Scan ${{ matrix.service }} image
+        env:
+          TRIVY_CACHE_DIR: ~/.cache/trivy
         run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${{ matrix.service }}:ci
 
       - name: Tag image for GHCR

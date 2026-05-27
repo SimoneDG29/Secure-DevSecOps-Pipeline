@@ -221,6 +221,50 @@ strategy:
 - Reduced YAML duplication and improved maintainability
 - Better utilization of GitHub Actions runners
 
+## Caching Strategy
+
+The pipeline implements a multi-layer caching strategy to reduce execution time and CI costs.
+
+### Pip cache (Python dependencies)
+Using `actions/setup-python@v5` with pip caching enabled:
+
+```yaml
+with:
+  cache: "pip"
+  cache-dependency-path: |
+    services/${{ matrix.service }}/requirements.txt
+    services/${{ matrix.service }}/requirements-dev.txt
+```
+- Cache is automatically restored per service
+- A new cache key is generated only when requirements files change
+- Each matrix service gets an isolated cache (no conflicts)
+
+## Trivy cache
+
+Vulnerability DB caching is enabled via `actions/cache`:
+
+- Speeds up filesystem and image scans
+- Stores vulnerability database locally on runner cache directory
+- Reused across workflow runs
+
+## Docker Build cache
+
+Enabled via GitHub Actions cache backend:
+
+```yaml
+cache-from: type=gha,scope=${{ matrix.service }}
+cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+```
+- Reuses intermediate image layers
+- Scoped per service to avoid cross-service contamination
+- Significantly reduces build time in matrix builds
+
+### Benefits
+
+- Faster CI execution on repeated runs
+- Reduced dependency re-installation
+- Optimized Docker rebuilds per service
+
 ---
 
 # Pipeline Flow
