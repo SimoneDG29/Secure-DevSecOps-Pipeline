@@ -174,6 +174,55 @@ Implemented with:
 
 ---
 
+## CI/CD Optimization
+
+This project includes a set of CI/CD optimizations aimed at improving pipeline performance, scalability, and maintainability.
+
+The main focus is reducing execution time and eliminating redundant workload across microservices-based workflows.
+
+## Matrix-based Parallel Execution
+
+The pipeline uses **GitHub Actions matrix strategy** to parallelize repetitive operations across microservices.
+
+### Before optimization
+
+Without matrix strategy:
+
+- Each service was processed sequentially
+- Repeated YAML blocks for each microservice
+- Longer CI execution time due to serial processing
+
+### After optimization
+
+The pipeline was refactored to use a matrix strategy:
+
+- Parallel execution of tests across all services
+- Parallel Docker image builds
+- Parallel image security scanning
+- Parallel SBOM generation
+
+### Example implementation
+
+```yaml
+strategy:
+  matrix:
+    service:
+      - auth-service
+      - api-service
+      - products-service
+      - inventory-service
+      - frontend-service
+```
+
+### Benefits
+
+- Reduced CI execution time through parallelization
+- Improved scalability for additional microservices
+- Reduced YAML duplication and improved maintainability
+- Better utilization of GitHub Actions runners
+
+---
+
 # Pipeline Flow
 
 ## Pull Request workflow
