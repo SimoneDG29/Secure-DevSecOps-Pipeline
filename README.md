@@ -265,6 +265,26 @@ cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 - Reduced dependency re-installation
 - Optimized Docker rebuilds per service
 
+## Concurrency Control
+
+The pipeline uses GitHub Actions concurrency to prevent redundant workflow executions and reduce CI costs.
+
+```yaml
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+- Ensures only one running workflow per branch and workflow at a time
+- Automatically cancels previous runs when a new commit is pushed
+- Prevents duplicated executions of expensive jobs (Docker builds, Trivy scans, OWASP ZAP)
+
+### Benefits
+
+- Reduces CI execution time and resource usage
+- Avoids redundant builds and security scans
+- Improves feedback loop speed during active development
+- Prevents overlapping deployments in fast commit scenarios
+
 ---
 
 # Pipeline Flow
