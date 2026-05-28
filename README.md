@@ -285,6 +285,84 @@ concurrency:
 - Improves feedback loop speed during active development
 - Prevents overlapping deployments in fast commit scenarios
 
+## Path Filtering & Dynamic Matrix Generation
+
+This pipeline introduces **path-based filtering combined with dynamic matrix generation** to ensure that only the necessary microservices are processed during CI execution.
+
+This optimization reduces redundant work by avoiding builds, tests, and scans for services that have not changed.
+
+### Before optimization
+
+Without path filtering and dynamic matrix:
+
+- All microservices were always included in CI runs
+- Tests, builds, and scans executed even if no relevant code changed
+- Wasted compute time on unaffected services
+- Fixed static matrix required manual updates when adding services
+
+### After optimization
+
+The pipeline dynamically determines which services changed using `dorny/paths-filter` and builds a runtime matrix:
+
+- Only modified services are included in the CI matrix
+- Downstream jobs (tests, builds, scans) run only for affected services
+- Helm changes are detected separately for infrastructure validation
+- Fully automated service discovery based on Git changes
+
+### Example implementation
+
+```yaml
+- name: Filter changed services
+  uses: dorny/paths-filter@v3
+  with:
+    filters: |
+      auth-service:
+        - 'services/auth-service/**'
+      api-service:
+        - 'services/api-service/**'
+      products-service:
+        - 'services/products-service/**'
+      inventory-service:
+        - 'services/inventory-service/**'
+      frontend-service:
+        - 'services/frontend-service/**'
+      helm:
+        - 'infrastructure/helm/**'
+```
+
+### Dynamic matrix generation
+
+The filtered results are transformed into a **dynamic JSON matrix** used by GitHub Actions:
+
+```yaml
+strategy:
+  matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+```
+
+This allows jobs to scale automatically based on actual changes:
+
+- If 1 service changes → 1 parallel job
+- If 3 services change → 3 parallel jobs
+- If no services change → downstream jobs are skipped
+
+### Optional change flag optimization
+
+A `has_changes` flag is introduced to simplify conditional execution:
+
+```yaml
+if: needs.detect-changes.outputs.has_changes == 'true'
+```
+
+This improves readability and avoids repeated JSON comparisons across jobs.
+
+### Benefits
+
+- Eliminates unnecessary CI execution for unchanged services
+- Reduces pipeline runtime significantly in partial-change scenarios
+- Enables fully automatic scaling of CI workloads
+- Improves maintainability by removing static service lists from jobs
+- Keeps CI aligned with repository structure without manual updates
+
 ---
 
 # Pipeline Flow

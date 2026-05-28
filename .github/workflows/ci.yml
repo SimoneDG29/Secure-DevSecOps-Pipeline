@@ -11,16 +11,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-test:
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      helm: ${{ steps.filter.outputs.helm }}
+      has_changes: ${{ steps.flag.outputs.has_changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            auth-service:
+              - 'services/auth-service/**'
+            api-service:
+              - 'services/api-service/**'
+            products-service:
+              - 'services/products-service/**'
+            inventory-service:
+              - 'services/inventory-service/**'
+            frontend-service:
+              - 'services/frontend-service/**'
+            helm:
+              - 'infrastructure/helm/**'
+
+      - name: Build dynamic matrix
+        id: set-matrix
+        run: |
+          changed=()
+
+          [[ "${{ steps.filter.outputs.auth-service }}" == "true" ]] && changed+=("\"auth-service\"")
+          [[ "${{ steps.filter.outputs.api-service }}" == "true" ]] && changed+=("\"api-service\"")
+          [[ "${{ steps.filter.outputs.products-service }}" == "true" ]] && changed+=("\"products-service\"")
+          [[ "${{ steps.filter.outputs.inventory-service }}" == "true" ]] && changed+=("\"inventory-service\"")
+          [[ "${{ steps.filter.outputs.frontend-service }}" == "true" ]] && changed+=("\"frontend-service\"")
+
+          if [ ${#changed[@]} -eq 0 ]; then
+            echo 'matrix={"service":[]}' >> $GITHUB_OUTPUT
+          else
+            joined=$(IFS=,; echo "${changed[*]}")
+            echo "matrix={\"service\":[${joined}]}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set has-changes flag
+        id: flag
+        run: |
+          MATRIX='${{ steps.set-matrix.outputs.matrix }}'
+
+          if [ "$MATRIX" = '{"service":[]}' ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+  lint-test:
+    needs: [detect-changes]
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.has_changes == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - auth-service
-          - api-service
-          - products-service
-          - inventory-service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,9 +114,12 @@ jobs:
         run: semgrep --config .semgrep.yml --error --strict
 
   dependency-scan:
+    needs: [detect-changes, lint-test]
+    if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    needs: [lint-test]
-
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,18 +141,20 @@ jobs:
           restore-keys: |
             trivy-${{ runner.os }}
 
-      - name: Scan repository dependencies
+      - name: Scan service dependencies
         env:
           TRIVY_CACHE_DIR: ~/.cache/trivy
         run: |
-          trivy fs . \
+          trivy fs services/${{ matrix.service }} \
             --scanners vuln \
             --severity HIGH,CRITICAL \
             --exit-code 1 \
             --ignore-unfixed
 
   helm-lint:
+    needs: [detect-changes]
     runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.helm == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,21 +166,15 @@ jobs:
         run: helm lint infrastructure/helm/secure-pipeline
 
   build-and-scan-images:
+    needs: [detect-changes, lint-test, semgrep, helm-lint, dependency-scan]
     runs-on: ubuntu-latest
-    needs: [lint-test, semgrep, helm-lint, dependency-scan]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true'
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - auth-service
-          - api-service
-          - products-service
-          - inventory-service
-          - frontend-service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -181,21 +234,15 @@ jobs:
 
   sign-images:
     runs-on: ubuntu-latest
-    needs: build-and-scan-images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [detect-changes, build-and-scan-images]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.has_changes == 'true'
     permissions:
       contents: read
       packages: write
       id-token: write
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - auth-service
-          - api-service
-          - products-service
-          - inventory-service
-          - frontend-service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -238,7 +285,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-scan-images
     if: github.event_name == 'push'
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -372,19 +418,14 @@ jobs:
 
   sbom:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    needs: [detect-changes, build-and-scan-images]
+    if: github.event_name == 'workflow_dispatch' && needs.detect-changes.outputs.has_changes == 'true'
     permissions:
       contents: read
       packages: read
     strategy:
       fail-fast: false
-      matrix:
-        service:
-          - auth-service
-          - api-service
-          - products-service
-          - inventory-service
-          - frontend-service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
