@@ -423,14 +423,19 @@ jobs:
 
   sbom:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-and-scan-images]
-    if: github.event_name == 'workflow_dispatch' && needs.detect-changes.outputs.has_changes == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: read
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      matrix:
+        service:
+        - auth-service
+        - api-service
+        - products-service
+        - inventory-service
+        - frontend-service
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -445,10 +450,23 @@ jobs:
       - name: Set GHCR owner (lowercase)
         run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Check if image exists in GHCR
+        run: |
+          IMAGE="ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci"
+
+          if ! docker manifest inspect $IMAGE > /dev/null 2>&1; then
+            echo "Image $IMAGE not found in GHCR - skipping SBOM"
+            echo "SKIP=true" >> $GITHUB_ENV
+          else
+            echo "SKIP=false" >> $GITHUB_ENV
+          fi
+
       - name: Pull ${{ matrix.service }} image
+        if: env.SKIP == 'false'
         run: docker pull ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci
 
       - name: Generate SBOM for ${{ matrix.service }}
+        if: env.SKIP == 'false'
         uses: anchore/sbom-action@v0.16.0
         with:
           image: ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci
@@ -456,6 +474,7 @@ jobs:
           output-file: ${{ matrix.service }}-sbom.spdx.json
 
       - name: Upload SBOM
+        if: env.SKIP == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: sboms

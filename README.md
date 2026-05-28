@@ -81,7 +81,7 @@ Cosign Sign
 OWASP ZAP Full Scan (DAST)
    ↓
 Release-ready signed images
-   ├── Manual SBOM Generation
+   ├── SBOM Generation
    ├── Manual Secret Creation
    └── Helm Deploy to Kubernetes
 ```
@@ -166,11 +166,11 @@ Implemented with:
 - build-and-scan-images
 - sign-images
 - zap-dast
+- sbom
 
 ### Manual operational jobs
 - create-secrets
 - deploy
-- sbom
 
 ---
 
@@ -399,6 +399,7 @@ Runs automatically on merge/push to `main`:
 5. build-and-scan-images
 6. sign-images
 7. zap-dast
+8. sbom
 
 Purpose:
 
@@ -406,6 +407,7 @@ Purpose:
 - vulnerability scan
 - publish signed images to GHCR
 - run DAST (OWASP ZAP) before deployment
+- generates SBOM artifacts for all images.
 
 ---
 
@@ -418,9 +420,6 @@ Creates Kubernetes secrets from GitHub Secrets.
 
 ### deploy
 Deploys services via Helm.
-
-### sbom
-Generates SBOM artifacts for all images.
 
 This separation avoids automatic deployments during active development.
 
@@ -524,9 +523,10 @@ The pipeline includes a full-stack DAST scan executed after deployment in Docker
 
 ## SBOM Generation
 
-Using Anchore SBOM action.
+The SBOM is generated automatically for all services on every push to `main`.
+Uses Anchore SBOM action.
 
-Artifacts generated in SPDX JSON format.
+Artifacts are generated in SPDX JSON format and published as workflow artifacts.
 
 Purpose:
 
