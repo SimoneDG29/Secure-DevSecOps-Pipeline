@@ -32,7 +32,6 @@ The main goal is to demonstrate:
 - secure CI/CD automation with GitHub Actions
 - container supply chain security
 - Kubernetes deployment workflows
-- secret management
 - container image signing
 - SBOM generation
 - layered security gates before deployment
@@ -82,7 +81,6 @@ OWASP ZAP Full Scan (DAST)
    ↓
 Release-ready signed images
    ├── SBOM Generation
-   ├── Manual Secret Creation
    └── Helm Deploy to Kubernetes
 ```
 
@@ -169,7 +167,6 @@ Implemented with:
 - sbom
 
 ### Manual operational jobs
-- create-secrets
 - deploy
 
 ---
@@ -415,9 +412,6 @@ Purpose:
 
 Triggered via `workflow_dispatch`.
 
-### create-secrets
-Creates Kubernetes secrets from GitHub Secrets.
-
 ### deploy
 Deploys services via Helm.
 
@@ -535,21 +529,6 @@ Purpose:
 
 ---
 
-## Secret Management
-
-Secrets are not committed.
-
-Sensitive values are injected from GitHub Secrets into Kubernetes Secrets.
-
-Examples:
-
-- PRODUCTS_DB_HOST
-- PRODUCTS_DB_PORT
-- PRODUCTS_DB_NAME
-- PRODUCTS_DB_USER
-- PRODUCTS_DB_PASSWORD
-
----
 
 ## Secure Containers
 
@@ -566,7 +545,7 @@ These controls implement a layered DevSecOps pipeline covering:
 - dependency security (Trivy FS + Dependabot + SBOM)
 - container security (Trivy)
 - supply chain integrity (Cosign signing)
-- secure deployment practices (Kubernetes + Secrets management)
+- secure deployment practices (Kubernetes)
 - runtime security testing (OWASP ZAP)
 
 ---
@@ -625,8 +604,7 @@ Supported:
 
 Deploy manually:
 
-1. Run `create-secrets`
-2. Run `deploy`
+1. Run `deploy`
 
 ---
 
@@ -706,7 +684,6 @@ LICENSE
 - [x] GHCR image publishing
 - [x] Cosign image signing
 - [x] Helm deployment
-- [x] Kubernetes secret management
 - [x] SBOM generation
 - [x] OWASP ZAP DAST
 

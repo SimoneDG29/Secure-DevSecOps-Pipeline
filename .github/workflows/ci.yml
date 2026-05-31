@@ -265,26 +265,6 @@ jobs:
       - name: Sign ${{ matrix.service }} image (keyless)
         run: cosign sign --yes ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci
 
-  create-secrets:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-    steps:
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
-
-      - name: Create Kubernetes Secret
-        run: |
-          kubectl create secret generic products-db-secret \
-            --from-literal=DB_HOST=${{ secrets.DB_HOST }} \
-            --from-literal=DB_PORT=${{ secrets.DB_PORT }} \
-            --from-literal=DB_NAME=${{ secrets.DB_NAME }} \
-            --from-literal=DB_USER=${{ secrets.DB_USER }} \
-            --from-literal=DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-            --dry-run=client -o yaml | kubectl apply -f -
 
   zap-dast:
     runs-on: ubuntu-latest
@@ -388,7 +368,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: [helm-lint, create-secrets, build-and-scan-images, sign-images, zap-dast]
+    needs: [helm-lint, build-and-scan-images, sign-images, zap-dast]
     if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
