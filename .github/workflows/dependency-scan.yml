@@ -1,0 +1,46 @@
+name: dependency-scan
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        description: "JSON matrix of services to scan"
+        required: true
+        type: string
+
+jobs:
+  trivy-fs:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Restore Trivy cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-${{ runner.os }}
+          restore-keys: |
+            trivy-${{ runner.os }}
+
+      - name: Scan service dependencies
+        env:
+          TRIVY_CACHE_DIR: ~/.cache/trivy
+        run: |
+          trivy fs services/${{ matrix.service }} \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --ignore-unfixed
