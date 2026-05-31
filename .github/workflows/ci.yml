@@ -25,22 +25,8 @@ jobs:
     with:
       matrix: ${{ needs.detect-changes.outputs.matrix }}
 
-  semgrep:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Semgrep
-        run: python -m pip install --upgrade semgrep
-
-      - name: Run Semgrep (fail on invalid rules)
-        run: semgrep --config .semgrep.yml --error --strict
+  sast:
+    uses: ./.github/workflows/sast.yml
 
   dependency-scan:
     needs: [detect-changes, lint-test]
