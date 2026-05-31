@@ -81,7 +81,7 @@ jobs:
         run: helm lint infrastructure/helm/secure-pipeline
 
   build-and-scan-images:
-    needs: [detect-changes, lint-test, semgrep, helm-lint, dependency-scan]
+    needs: [detect-changes, lint-test, sast, helm-lint, dependency-scan]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true'
     permissions:
