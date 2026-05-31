@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   detect-changes:
-    uses: ./.github/workflows/reusables/detect-changes.yml
+    uses: ./.github/workflows/detect-changes.yml
 
   lint-test:
     needs: [detect-changes]
