@@ -1,0 +1,73 @@
+name: detect-changes
+
+on:
+  workflow_call:
+    outputs:
+      matrix:
+        description: "JSON matrix of changed services"
+        value: ${{ jobs.detect-changes.outputs.matrix }}
+      has_changes:
+        description: "True if at least one service changed"
+        value: ${{ jobs.detect-changes.outputs.has_changes }}
+      helm_changed:
+        description: "True if helm charts changed"
+        value: ${{ jobs.detect-changes.outputs.helm_changed }}
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_changes: ${{ steps.flag.outputs.has_changes }}
+      helm_changed: ${{ steps.filter.outputs.helm }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ github.token }}
+          filters: |
+            auth-service:
+              - 'services/auth-service/**'
+            api-service:
+              - 'services/api-service/**'
+            products-service:
+              - 'services/products-service/**'
+            inventory-service:
+              - 'services/inventory-service/**'
+            frontend-service:
+              - 'services/frontend-service/**'
+            helm:
+              - 'infrastructure/helm/**'
+
+      - name: Build dynamic matrix
+        id: set-matrix
+        run: |
+          changed=()
+
+          [[ "${{ steps.filter.outputs.auth-service }}" == "true" ]] && changed+=("\"auth-service\"")
+          [[ "${{ steps.filter.outputs.api-service }}" == "true" ]] && changed+=("\"api-service\"")
+          [[ "${{ steps.filter.outputs.products-service }}" == "true" ]] && changed+=("\"products-service\"")
+          [[ "${{ steps.filter.outputs.inventory-service }}" == "true" ]] && changed+=("\"inventory-service\"")
+          [[ "${{ steps.filter.outputs.frontend-service }}" == "true" ]] && changed+=("\"frontend-service\"")
+
+          if [ ${#changed[@]} -eq 0 ]; then
+            echo 'matrix={"service":[]}' >> $GITHUB_OUTPUT
+          else
+            joined=$(IFS=,; echo "${changed[*]}")
+            echo "matrix={\"service\":[${joined}]}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set has-changes flag
+        id: flag
+        run: |
+          MATRIX='${{ steps.set-matrix.outputs.matrix }}'
+
+          if [ "$MATRIX" = '{"service":[]}' ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
