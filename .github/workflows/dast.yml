@@ -1,0 +1,132 @@
+name: dast
+
+on:
+  workflow_call:
+    inputs:
+      target-url:
+        description: "URL to scan with OWASP ZAP"
+        required: false
+        type: string
+        default: "http://frontend-service:80"
+      fail-on-high:
+        description: "Fail if any HIGH confidence High/Critical vuln is found"
+        required: false
+        type: boolean
+        default: true
+      max-medium-vulns:
+        description: "Maximum number of medium-confidence vulns before failing"
+        required: false
+        type: number
+        default: 5
+    secrets:
+      DB_NAME:
+        required: true
+      DB_USER:
+        required: true
+      DB_PASSWORD:
+        required: true
+      POSTGRES_DB:
+        required: true
+      POSTGRES_USER:
+        required: true
+      POSTGRES_PASSWORD:
+        required: true
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Create .env from secrets
+        run: |
+          cat <<EOF > .env
+          DB_HOST=postgres
+          DB_PORT=5432
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          EOF
+
+      - name: Start full stack
+        run: docker compose --env-file .env up -d --build
+
+      - name: Wait for frontend readiness
+        run: |
+          for i in {1..40}; do
+            if curl -fs http://localhost:5173 > /dev/null; then
+              echo "Frontend is up"
+              exit 0
+            fi
+            echo "Waiting for frontend... ($i/40)"
+            sleep 3
+          done
+
+          echo "Frontend not reachable"
+          docker compose logs
+          exit 1
+
+      - name: Run OWASP ZAP Full Scan
+        run: |
+          set -e
+
+          chmod -R 777 ${{ github.workspace }}
+
+          NETWORK_NAME=$(docker network ls --format '{{.Name}}' | grep default | head -n 1)
+          
+          echo "Using Docker network: $NETWORK_NAME"
+
+          docker run --rm \
+            --network "$NETWORK_NAME" \
+            -v ${{ github.workspace }}:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py \
+            -t ${{ inputs.target-url }} \
+            -r zap-report.html \
+            -J zap-report.json \
+            -l WARN \
+            -I \
+            -m 5
+
+      - name: Evaluate scan results
+        run: |
+          echo "Analyzing vulnerabilities (confidence-based policy)..."
+
+          HIGH_CONF_COUNT=$(jq '[.. | objects | select((.confidence? // 0) == 3 and (.riskdesc? | test("High|Critical")))] | length' zap-report.json)
+          MED_CONF_COUNT=$(jq '[.. | objects | select((.confidence? // 0) == 2 and (.riskdesc? | test("High|Critical")))] | length' zap-report.json)
+
+          echo "HIGH confidence vulns : $HIGH_CONF_COUNT"
+          echo "MEDIUM confidence vulns: $MED_CONF_COUNT"
+
+          if ${{ inputs.fail-on-high }} && [ "$HIGH_CONF_COUNT" -gt 0 ]; then
+            echo "❌ SECURITY FAIL: High confidence High/Critical vulnerabilities found"
+            exit 1
+          fi
+
+          if [ "$MED_CONF_COUNT" -gt ${{ inputs.max-medium-vulns }} ]; then
+            echo "⚠️ SECURITY FAIL: Too many medium confidence vulnerabilities ($MED_CONF_COUNT > ${{ inputs.max-medium-vulns }})"
+            exit 1
+          fi
+
+          echo "✅ Security scan passed"
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            zap-report.html
+            zap-report.json
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

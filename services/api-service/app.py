@@ -7,8 +7,6 @@ CORS(
     resources={r"/*": {"origins": ["http://localhost:5173"]}}
 )
 
-# Comment line to trigger CI pipeline
-
 @app.route('/api', methods=['GET'])
 def get_data():
     """
