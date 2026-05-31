@@ -9,6 +9,8 @@ CORS(
     resources={r"/*": {"origins": ["http://localhost:5173"]}}
 )
 
+# Comment line to trigger CI pipeline
+
 register_routes(app)
 
 if __name__ == "__main__":

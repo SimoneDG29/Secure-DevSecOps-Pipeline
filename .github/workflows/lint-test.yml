@@ -1,0 +1,43 @@
+name: lint-test
+ 
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        description: "JSON matrix of services to test"
+        required: true
+        type: string
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.12"
+ 
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: "pip"
+          cache-dependency-path: |
+            services/${{ matrix.service }}/requirements.txt
+            services/${{ matrix.service }}/requirements-dev.txt
+ 
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            -r services/${{ matrix.service }}/requirements.txt \
+            -r services/${{ matrix.service }}/requirements-dev.txt
+ 
+      - name: Run tests
+        run: pytest services/${{ matrix.service }}/tests
