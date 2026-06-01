@@ -76,36 +76,10 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
   deploy:
-    runs-on: ubuntu-latest
-    needs: [helm-lint, build-and-scan-images, post-build, dast]
-    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-
-      - name: Set GHCR owner (lowercase)
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
-
-      - name: Deploy with Helm
-        run: |
-          helm upgrade --install secure-pipeline infrastructure/helm/secure-pipeline \
-            --set authService.image.repository=ghcr.io/${{ env.OWNER }}/auth-service \
-            --set apiService.image.repository=ghcr.io/${{ env.OWNER }}/api-service \
-            --set productsService.image.repository=ghcr.io/${{ env.OWNER }}/products-service \
-            --set inventoryService.image.repository=ghcr.io/${{ env.OWNER }}/inventory-service \
-            --set frontendService.image.repository=ghcr.io/${{ env.OWNER }}/frontend-service \
-            --set authService.image.tag=ci \
-            --set apiService.image.tag=ci \
-            --set productsService.image.tag=ci \
-            --set inventoryService.image.tag=ci \
-            --set frontendService.image.tag=ci
+    needs: [helm-lint, build-and-scan-images, post-build, dast]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy.yml
+    secrets:
+      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
