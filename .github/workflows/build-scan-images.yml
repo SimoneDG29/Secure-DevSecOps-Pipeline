@@ -1,0 +1,95 @@
+name: build-scan-images
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        required: true
+        type: string
+        description: "JSON matrix of services to build"
+      trivy_severity:
+        required: false
+        type: string
+        default: "HIGH,CRITICAL"
+        description: "Comma-separated Trivy severity levels to fail on"
+      trivy_ignore_unfixed:
+        required: false
+        type: boolean
+        default: true
+        description: "Ignore vulnerabilities with no available fix"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set GHCR owner (lowercase)
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Build ${{ matrix.service }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/${{ matrix.service }}
+          load: true
+          tags: ${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Restore Trivy DB cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ runner.os }}
+          restore-keys: |
+            trivy-db-${{ runner.os }}-
+
+      - name: Update Trivy DB
+        env:
+          TRIVY_CACHE_DIR: ~/.cache/trivy
+        run: trivy image --download-db-only
+
+      - name: Scan ${{ matrix.service }} image
+        env:
+          TRIVY_CACHE_DIR: ~/.cache/trivy
+        run: |
+          ARGS="--exit-code 1 --severity ${{ inputs.trivy_severity }} --skip-db-update"
+          if [ "${{ inputs.trivy_ignore_unfixed }}" = "true" ]; then
+            ARGS="$ARGS --ignore-unfixed"
+          fi
+          trivy image $ARGS ${{ matrix.service }}:ci
+
+      - name: Tag image for GHCR
+        run: docker tag ${{ matrix.service }}:ci ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci
+
+      - name: Push image to GHCR
+        run: docker push ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci

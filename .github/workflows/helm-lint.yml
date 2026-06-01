@@ -1,4 +1,4 @@
-name: deploy
+name: helm-lint
  
 on:
   workflow_call:
