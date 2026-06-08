@@ -6,472 +6,85 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  detect-changes:
+    uses: ./.github/workflows/detect-changes.yml
+
+  secret-scan:
+    uses: ./.github/workflows/secret-scan.yml
+    with:
+      mode: incremental
+
   lint-test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    uses: ./.github/workflows/lint-test.yml
+    with:
+      matrix: ${{ needs.detect-changes.outputs.matrix }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install auth-service deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r services/auth-service/requirements.txt -r services/auth-service/requirements-dev.txt
-
-      - name: Install api-service deps
-        run: |
-          pip install -r services/api-service/requirements.txt -r services/api-service/requirements-dev.txt
-
-      - name: Install products-service deps
-        run: |
-          pip install -r services/products-service/requirements.txt -r services/products-service/requirements-dev.txt
-
-      - name: Install inventory-service deps
-        run: |
-          pip install -r services/inventory-service/requirements.txt -r services/inventory-service/requirements-dev.txt
-
-      - name: Run auth-service tests
-        run: pytest services/auth-service/tests
-
-      - name: Run api-service tests
-        run: pytest services/api-service/tests
-
-      - name: Run products-service tests
-        run: pytest services/products-service/tests
-
-      - name: Run inventory-service tests
-        run: pytest services/inventory-service/tests
-
-  semgrep:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Semgrep
-        run: python -m pip install --upgrade semgrep
-
-      - name: Run Semgrep (fail on invalid rules)
-        run: semgrep --config .semgrep.yml --error --strict
+  sast:
+    uses: ./.github/workflows/sast.yml
 
   dependency-scan:
-    runs-on: ubuntu-latest
-    needs: [lint-test]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-
-      - name: Scan repository dependencies
-        run: |
-          trivy fs . \
-            --scanners vuln \
-            --severity HIGH,CRITICAL \
-            --exit-code 1 \
-            --ignore-unfixed
+    needs: [detect-changes, lint-test]
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    uses: ./.github/workflows/dependency-scan.yml
+    with:
+      matrix: ${{ needs.detect-changes.outputs.matrix }}
 
   helm-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-
-      - name: Lint Helm chart
-        run: helm lint infrastructure/helm/secure-pipeline
+    needs: detect-changes
+    if: needs.detect-changes.outputs.helm_changed == 'true'
+    uses: ./.github/workflows/helm-lint.yml
+    secrets:
+      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
 
   build-and-scan-images:
-    runs-on: ubuntu-latest
-    needs: [lint-test, semgrep, helm-lint, dependency-scan]
-    if: github.event_name == 'push'
     permissions:
       contents: read
       packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    needs: [detect-changes, lint-test, sast, dependency-scan, secret-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.has_changes == 'true'
+    uses: ./.github/workflows/build-scan-images.yml
+    with:
+      matrix: ${{ needs.detect-changes.outputs.matrix }}
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Set GHCR owner (lowercase)
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Build auth-service image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/auth-service
-          load: true
-          tags: auth-service:ci
-
-      - name: Build api-service image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/api-service
-          load: true
-          tags: api-service:ci
-
-      - name: Build products-service image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/products-service
-          load: true
-          tags: products-service:ci
-
-      - name: Build inventory-service image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/inventory-service
-          load: true
-          tags: inventory-service:ci
-
-      - name: Build frontend-service image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/frontend-service
-          load: true
-          tags: frontend-service:ci
-
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-
-      - name: Scan auth-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed auth-service:ci
-
-      - name: Scan api-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed api-service:ci
-
-      - name: Scan products-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed products-service:ci
-
-      - name: Scan inventory-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed inventory-service:ci
-
-      - name: Scan frontend-service image
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed frontend-service:ci
-
-      - name: Tag images for GHCR
-        run: |
-          docker tag auth-service:ci ghcr.io/${{ env.OWNER }}/auth-service:ci
-          docker tag api-service:ci ghcr.io/${{ env.OWNER }}/api-service:ci
-          docker tag products-service:ci ghcr.io/${{ env.OWNER }}/products-service:ci
-          docker tag inventory-service:ci ghcr.io/${{ env.OWNER }}/inventory-service:ci
-          docker tag frontend-service:ci ghcr.io/${{ env.OWNER }}/frontend-service:ci
-
-      - name: Push images to GHCR
-        if: github.ref == 'refs/heads/main'
-        run: |
-          docker push ghcr.io/${{ env.OWNER }}/auth-service:ci
-          docker push ghcr.io/${{ env.OWNER }}/api-service:ci
-          docker push ghcr.io/${{ env.OWNER }}/products-service:ci
-          docker push ghcr.io/${{ env.OWNER }}/inventory-service:ci
-          docker push ghcr.io/${{ env.OWNER }}/frontend-service:ci
-
-  sign-images:
-    runs-on: ubuntu-latest
-    needs: build-and-scan-images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  post-build:
     permissions:
       contents: read
       packages: write
       id-token: write
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+    needs: [detect-changes, build-and-scan-images]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.has_changes == 'true'
+    uses: ./.github/workflows/post-build.yml
+    with:
+      sign_matrix: ${{ needs.detect-changes.outputs.matrix }}
 
-      - name: Set GHCR owner (lowercase)
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.7.0
-
-      - name: Sign auth-service image (keyless)
-        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/auth-service:ci
-
-      - name: Sign api-service image (keyless)
-        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/api-service:ci
-
-      - name: Sign products-service image (keyless)
-        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/products-service:ci
-      
-      - name: Sign inventory-service image (keyless)
-        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/inventory-service:ci
-
-      - name: Sign frontend-service image (keyless)
-        run: cosign sign --yes ghcr.io/${{ env.OWNER }}/frontend-service:ci
-
-  create-secrets:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-    steps:
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
-
-      - name: Create Kubernetes Secret
-        run: |
-          kubectl create secret generic products-db-secret \
-            --from-literal=DB_HOST=${{ secrets.DB_HOST }} \
-            --from-literal=DB_PORT=${{ secrets.DB_PORT }} \
-            --from-literal=DB_NAME=${{ secrets.DB_NAME }} \
-            --from-literal=DB_USER=${{ secrets.DB_USER }} \
-            --from-literal=DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-  zap-dast:
-    runs-on: ubuntu-latest
+  dast:
     needs: build-and-scan-images
     if: github.event_name == 'push'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
-      - name: Create .env from GitHub Secrets
-        run: |
-          cat <<EOF > .env
-          DB_HOST=postgres
-          DB_PORT=5432
-          DB_NAME=${{ secrets.DB_NAME }}
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          EOF
-
-      - name: Start full stack
-        run: |
-          docker compose --env-file .env up -d --build
-
-      - name: Wait for frontend readiness
-        run: |
-          for i in {1..40}; do
-            if curl -fs http://localhost:5173 > /dev/null; then
-              echo "Frontend is up"
-              exit 0
-            fi
-            echo "Waiting for frontend..."
-            sleep 3
-          done
-
-          echo "Frontend not reachable"
-          docker compose logs
-          exit 1
-
-      - name: Run OWASP ZAP Full Scan (DAST)
-        run: |
-          set -e
-
-          chmod -R 777 ${{ github.workspace }}
-
-          NETWORK_NAME=$(docker network ls --format '{{.Name}}' | grep default | head -n 1)
-
-          echo "Using Docker network: $NETWORK_NAME"
-
-          docker run --rm \
-            --network "$NETWORK_NAME" \
-            -v ${{ github.workspace }}:/zap/wrk:rw \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-full-scan.py \
-            -t http://frontend-service:80 \
-            -r zap-report.html \
-            -J zap-report.json \
-            -l WARN \
-            -I \
-            -m 5
-
-          echo "Analyzing vulnerabilities (confidence-based policy)..."
-
-          HIGH_CONF_COUNT=$(jq '[.. | objects | select((.confidence? // 0) == 3 and (.riskdesc? | test("High|Critical")))] | length' zap-report.json)
-          MED_CONF_COUNT=$(jq '[.. | objects | select((.confidence? // 0) == 2 and (.riskdesc? | test("High|Critical")))] | length' zap-report.json)
-
-          echo "HIGH confidence vulns: $HIGH_CONF_COUNT"
-          echo "MEDIUM confidence vulns: $MED_CONF_COUNT"
-
-          if [ "$HIGH_CONF_COUNT" -gt 0 ]; then
-            echo "❌ SECURITY FAIL: High confidence High/Critical vulnerabilities found"
-            exit 1
-          fi
-
-          if [ "$MED_CONF_COUNT" -gt 5 ]; then
-            echo "⚠️ SECURITY FAIL: Too many medium confidence vulnerabilities"
-            exit 1
-          fi
-
-          echo "✅ Security scan passed"
-
-      - name: Upload ZAP report
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-report
-          path: |
-            zap-report.html
-            zap-report.json
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose down -v
+    uses: ./.github/workflows/dast.yml
+    secrets:
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
   deploy:
-    runs-on: ubuntu-latest
-    needs: [helm-lint, create-secrets, build-and-scan-images, sign-images, zap-dast]
-    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-
-      - name: Set GHCR owner (lowercase)
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
-
-      - name: Deploy with Helm
-        run: |
-          helm upgrade --install secure-pipeline infrastructure/helm/secure-pipeline \
-            --set authService.image.repository=ghcr.io/${{ env.OWNER }}/auth-service \
-            --set apiService.image.repository=ghcr.io/${{ env.OWNER }}/api-service \
-            --set productsService.image.repository=ghcr.io/${{ env.OWNER }}/products-service \
-            --set inventoryService.image.repository=ghcr.io/${{ env.OWNER }}/inventory-service \
-            --set frontendService.image.repository=ghcr.io/${{ env.OWNER }}/frontend-service \
-            --set authService.image.tag=ci \
-            --set apiService.image.tag=ci \
-            --set productsService.image.tag=ci \
-            --set inventoryService.image.tag=ci \
-            --set frontendService.image.tag=ci
-
-  sbom:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set GHCR owner (lowercase)
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Pull auth-service image
-        run: docker pull ghcr.io/${{ env.OWNER }}/auth-service:ci
-
-      - name: Pull api-service image
-        run: docker pull ghcr.io/${{ env.OWNER }}/api-service:ci
-
-      - name: Pull products-service image
-        run: docker pull ghcr.io/${{ env.OWNER }}/products-service:ci
-
-      - name: Pull inventory-service image
-        run: docker pull ghcr.io/${{ env.OWNER }}/inventory-service:ci
-
-      - name: Pull frontend-service image
-        run: docker pull ghcr.io/${{ env.OWNER }}/frontend-service:ci
-
-      - name: Generate SBOM for auth-service
-        uses: anchore/sbom-action@v0.16.0
-        with:
-          image: ghcr.io/${{ env.OWNER }}/auth-service:ci
-          format: spdx-json
-          output-file: auth-service-sbom.spdx.json
-
-      - name: Generate SBOM for api-service
-        uses: anchore/sbom-action@v0.16.0
-        with:
-          image: ghcr.io/${{ env.OWNER }}/api-service:ci
-          format: spdx-json
-          output-file: api-service-sbom.spdx.json
-
-      - name: Generate SBOM for products-service
-        uses: anchore/sbom-action@v0.16.0
-        with:
-          image: ghcr.io/${{ env.OWNER }}/products-service:ci
-          format: spdx-json
-          output-file: products-service-sbom.spdx.json
-
-      - name: Generate SBOM for inventory-service
-        uses: anchore/sbom-action@v0.16.0
-        with:
-          image: ghcr.io/${{ env.OWNER }}/inventory-service:ci
-          format: spdx-json
-          output-file: inventory-service-sbom.spdx.json
-
-      - name: Generate SBOM for frontend-service
-        uses: anchore/sbom-action@v0.16.0
-        with:
-          image: ghcr.io/${{ env.OWNER }}/frontend-service:ci
-          format: spdx-json
-          output-file: frontend-service-sbom.spdx.json
-
-      - name: Upload SBOMs
-        uses: actions/upload-artifact@v4
-        with:
-          name: sboms
-          path: |
-            auth-service-sbom.spdx.json
-            api-service-sbom.spdx.json
-            products-service-sbom.spdx.json
-            inventory-service-sbom.spdx.json
-            frontend-service-sbom.spdx.json
+    needs: [helm-lint, build-and-scan-images, post-build, dast]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy.yml
+    secrets:
+      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}

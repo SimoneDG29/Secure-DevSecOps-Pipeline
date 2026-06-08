@@ -1,0 +1,20 @@
+name: helm-lint
+ 
+on:
+  workflow_call:
+    secrets:
+      KUBE_CONFIG:
+        required: true
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+ 
+      - name: Lint Helm chart
+        run: helm lint infrastructure/helm/secure-pipeline
