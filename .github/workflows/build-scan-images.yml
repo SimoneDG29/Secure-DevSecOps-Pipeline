@@ -56,37 +56,25 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-
-      - name: Restore Trivy DB cache
+      - name: Restore Trivy cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/trivy
-          key: trivy-db-${{ runner.os }}
+          key: trivy-${{ runner.os }}
           restore-keys: |
-            trivy-db-${{ runner.os }}-
-
-      - name: Update Trivy DB
-        env:
-          TRIVY_CACHE_DIR: ~/.cache/trivy
-        run: trivy image --download-db-only
+            trivy-${{ runner.os }}-
 
       - name: Scan ${{ matrix.service }} image
+        uses: aquasecurity/trivy-action@0.33.1
         env:
           TRIVY_CACHE_DIR: ~/.cache/trivy
-        run: |
-          ARGS="--exit-code 1 --severity ${{ inputs.trivy_severity }} --skip-db-update"
-          if [ "${{ inputs.trivy_ignore_unfixed }}" = "true" ]; then
-            ARGS="$ARGS --ignore-unfixed"
-          fi
-          trivy image $ARGS ${{ matrix.service }}:ci
+        with:
+          image-ref: "${{ matrix.service }}:ci"
+          format: table
+          exit-code: "1"
+          severity: ${{ inputs.trivy_severity }}
+          ignore-unfixed: ${{ inputs.trivy_ignore_unfixed }}
+          vuln-type: "os,library"
 
       - name: Tag image for GHCR
         run: docker tag ${{ matrix.service }}:ci ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:ci
